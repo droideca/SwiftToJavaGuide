@@ -1,0 +1,2687 @@
+{
+  "guide": {
+    "title": "Swift to Java Conversion Guide",
+    "version": "1.0.0",
+    "javaBaseline": "21",
+    "description": "Practical, deterministic mappings for converting Swift code and Swift habits into idiomatic Java 21."
+  },
+  "categories": [
+    {
+      "id": "mindset",
+      "title": "Mindset shifts",
+      "summary": "The big conceptual differences: memory, null-safety, value types, defaults.",
+      "mappingCount": 2
+    },
+    {
+      "id": "data-types",
+      "title": "Data types",
+      "summary": "Primitives, overflow, boxing, optionals, tuples, enums and structs.",
+      "mappingCount": 17
+    },
+    {
+      "id": "strings",
+      "title": "String handling",
+      "summary": "Equality, interpolation, text blocks, UTF-16 length, method mapping.",
+      "mappingCount": 8
+    },
+    {
+      "id": "lambdas",
+      "title": "Lambdas and closures",
+      "summary": "Lambda syntax, capture rules, functional interfaces, method references.",
+      "mappingCount": 10
+    },
+    {
+      "id": "control-flow",
+      "title": "Control flow",
+      "summary": "if/guard, pattern matching, switch, loops, defer.",
+      "mappingCount": 12
+    },
+    {
+      "id": "objects",
+      "title": "Objects and initialization",
+      "summary": "Classes, properties, lifecycle, statics, constructors, concurrency basics.",
+      "mappingCount": 10
+    },
+    {
+      "id": "oop",
+      "title": "Encapsulation and inheritance",
+      "summary": "Access modifiers, scope, inheritance, interfaces, extensions, generics.",
+      "mappingCount": 10
+    },
+    {
+      "id": "exceptions",
+      "title": "Exception handling",
+      "summary": "Checked vs unchecked, throwing, catching, try?/try!, resources.",
+      "mappingCount": 7
+    },
+    {
+      "id": "collections",
+      "title": "Arrays and collections",
+      "summary": "Reference semantics, collection types, immutability, common operations.",
+      "mappingCount": 6
+    },
+    {
+      "id": "streams",
+      "title": "Streams",
+      "summary": "map/filter/reduce chains, collectors, comparators.",
+      "mappingCount": 7
+    },
+    {
+      "id": "functions",
+      "title": "Functions",
+      "summary": "Static methods, labels, overloading, varargs, inout, generics.",
+      "mappingCount": 5
+    },
+    {
+      "id": "testing",
+      "title": "Unit tests",
+      "summary": "XCTest / Swift Testing to JUnit Jupiter.",
+      "mappingCount": 2
+    }
+  ],
+  "mappings": [
+    {
+      "id": "arc-vs-gc",
+      "category": "mindset",
+      "title": "ARC → garbage collector",
+      "swift": "weak / unowned / ARC",
+      "java": "garbage collector (no equivalent needed)",
+      "summary": "Java uses a tracing garbage collector, so reference cycles do not leak and there is no weak/unowned bookkeeping.",
+      "risk": "low",
+      "detect": [
+        "\\b(weak|unowned)\\s+(var|let)\\b"
+      ],
+      "swiftExample": "weak var delegate: Delegate?",
+      "javaExample": "private Delegate delegate;   // plain reference; cycles are collected by the GC",
+      "gotchas": [
+        "There is no deinit; use AutoCloseable + try-with-resources for deterministic cleanup.",
+        "java.lang.ref.WeakReference exists but is for caches, not for breaking delegate cycles."
+      ],
+      "related": [
+        "deinit-autocloseable",
+        "weak-self-capture"
+      ],
+      "tags": [
+        "memory"
+      ],
+      "since": null
+    },
+    {
+      "id": "open-by-default",
+      "category": "mindset",
+      "title": "Classes are open by default",
+      "swift": "final class (closed by default for public)",
+      "java": "final class (open by default)",
+      "summary": "Java classes and methods can be subclassed/overridden unless marked final, the opposite of Swift's public default.",
+      "risk": "medium",
+      "detect": [],
+      "swiftExample": "public final class Money { }",
+      "javaExample": "public final class Money { }   // add final deliberately",
+      "gotchas": [
+        "Mark classes not designed for inheritance as final.",
+        "let → final is also opt-in: Java locals and fields are mutable unless you write final."
+      ],
+      "related": [
+        "access-modifiers",
+        "let-var"
+      ],
+      "tags": [
+        "inheritance"
+      ],
+      "since": null
+    },
+    {
+      "id": "let-var",
+      "category": "data-types",
+      "title": "let / var → final / var",
+      "swift": "let x = …  /  var x = …",
+      "java": "final var x = …  /  var x = …",
+      "summary": "Swift let maps to final; Java's var keyword is only type inference and works only for local variables.",
+      "risk": "low",
+      "detect": [
+        "^[ \\t]*(let|var)[ \\t]+\\w+[ \\t]*(:[^=\\n]+)?="
+      ],
+      "swiftExample": "let count = 42\nvar total = 0",
+      "javaExample": "final var count = 42;   // or: final int count = 42;\nvar total = 0;          // int",
+      "gotchas": [
+        "Java var is NOT mutability: it means 'infer the type'. Use final for immutability.",
+        "var works only for local variables, never for fields, parameters or return types."
+      ],
+      "related": [
+        "open-by-default"
+      ],
+      "tags": [
+        "variables",
+        "inference"
+      ],
+      "since": null
+    },
+    {
+      "id": "int-width",
+      "category": "data-types",
+      "title": "Int → long (or int)",
+      "swift": "Int (64-bit)",
+      "java": "long (64-bit) or int (32-bit)",
+      "summary": "Swift Int is 64-bit on modern platforms; Java int is 32-bit. Pick int or long deliberately based on value range.",
+      "risk": "medium",
+      "detect": [
+        "\\bInt(64|32|16|8)?\\b(?!\\()"
+      ],
+      "swiftExample": "let count: Int = 42",
+      "javaExample": "final long count = 42L;   // or int, if the range allows",
+      "gotchas": [
+        "Int32 → int, Int16 → short, Int8 → byte (byte is signed: -128…127).",
+        "long literals need an L suffix when they exceed int range: 3_000_000_000L."
+      ],
+      "related": [
+        "integer-overflow",
+        "unsigned-types",
+        "boxed-types"
+      ],
+      "tags": [
+        "primitives",
+        "numbers"
+      ],
+      "since": null
+    },
+    {
+      "id": "unsigned-types",
+      "category": "data-types",
+      "title": "UInt types → no unsigned types",
+      "swift": "UInt, UInt8, UInt16, UInt32, UInt64",
+      "java": "(none) — use a wider signed type",
+      "summary": "Java has no unsigned integer types; use a wider type or helpers like Integer.toUnsignedString and Byte.toUnsignedInt.",
+      "risk": "medium",
+      "detect": [
+        "\\bUInt(8|16|32|64)?\\b"
+      ],
+      "swiftExample": "let flags: UInt8 = 0xFF",
+      "javaExample": "int flags = 0xFF;                       // widen\nint unsigned = Byte.toUnsignedInt(b);   // read a byte as 0…255",
+      "gotchas": [
+        "byte b = (byte) 0xFF is -1, not 255."
+      ],
+      "related": [
+        "int-width"
+      ],
+      "tags": [
+        "primitives",
+        "numbers"
+      ],
+      "since": null
+    },
+    {
+      "id": "float-literal",
+      "category": "data-types",
+      "title": "Float → float (needs f suffix)",
+      "swift": "Float / Double",
+      "java": "float / double",
+      "summary": "Double maps to double. Float maps to float, and float literals need an f suffix.",
+      "risk": "low",
+      "detect": [
+        "\\bFloat\\b"
+      ],
+      "swiftExample": "let ratio: Float = 1.5",
+      "javaExample": "final float ratio = 1.5f;",
+      "gotchas": [
+        "1.5 without f is a double literal and will not compile into a float variable."
+      ],
+      "related": [
+        "int-width"
+      ],
+      "tags": [
+        "primitives",
+        "numbers"
+      ],
+      "since": null
+    },
+    {
+      "id": "character-utf16",
+      "category": "data-types",
+      "title": "Character → char (UTF-16 code unit)",
+      "swift": "Character (grapheme cluster)",
+      "java": "char (UTF-16 code unit) / int code point",
+      "summary": "A Java char is a single UTF-16 code unit, not a user-perceived character. Emoji and many symbols need two chars.",
+      "risk": "medium",
+      "detect": [
+        "\\bCharacter\\b"
+      ],
+      "swiftExample": "let c: Character = \"👍\"",
+      "javaExample": "String c = \"👍\";          // a char cannot hold it\nint cp = c.codePointAt(0);",
+      "gotchas": [
+        "Use code points (String.codePoints()) when you need real characters."
+      ],
+      "related": [
+        "string-length"
+      ],
+      "tags": [
+        "primitives",
+        "unicode"
+      ],
+      "since": null
+    },
+    {
+      "id": "integer-overflow",
+      "category": "data-types",
+      "title": "Overflow traps → overflow silently wraps",
+      "swift": "Overflow traps at runtime; &+ wraps",
+      "java": "Overflow silently wraps; Math.addExact throws",
+      "summary": "Swift traps on integer overflow. Java silently wraps around, so use Math.*Exact where overflow would be a bug.",
+      "risk": "high",
+      "detect": [
+        "&[+\\-*]",
+        "\\bInt(32|64)?\\.(max|min)\\b",
+        "addingReportingOverflow"
+      ],
+      "swiftExample": "let x = Int32.max\nlet y = x + 1   // traps",
+      "javaExample": "int x = Integer.MAX_VALUE;\nx = x + 1;                         // -2147483648, no error!\nint safe = Math.addExact(a, b);    // throws ArithmeticException",
+      "gotchas": [
+        "Math.addExact, subtractExact, multiplyExact, toIntExact all throw on overflow."
+      ],
+      "related": [
+        "int-width"
+      ],
+      "tags": [
+        "numbers",
+        "safety"
+      ],
+      "since": null
+    },
+    {
+      "id": "boxed-types",
+      "category": "data-types",
+      "title": "Generics need boxed types (Integer, Long…)",
+      "swift": "[Int], Int? (no boxing concept)",
+      "java": "List<Integer>, Integer (wrapper classes)",
+      "summary": "Collections and generics can't hold primitives, so Java auto-boxes int → Integer etc. Boxed values compare by reference with == and NPE when unboxing null.",
+      "risk": "high",
+      "detect": [
+        "\\[\\s*(Int|Double|Bool|Float|Int64|Int32)\\s*\\]",
+        "\\b(Int|Double|Bool)\\?"
+      ],
+      "swiftExample": "let ids: [Int] = [1000]\nlet a: Int? = nil",
+      "javaExample": "Integer a = 1000, b = 1000;\na == b;          // false! compares references\na.equals(b);     // true\n\nInteger maybe = null;\nint n = maybe;   // NullPointerException on unboxing",
+      "gotchas": [
+        "Always compare wrappers with equals() or Objects.equals().",
+        "List<int> is not allowed; write List<Integer>."
+      ],
+      "related": [
+        "equality-operator",
+        "int-width"
+      ],
+      "tags": [
+        "primitives",
+        "generics",
+        "equality"
+      ],
+      "since": null
+    },
+    {
+      "id": "optional-type",
+      "category": "data-types",
+      "title": "Optional type T? → nullable reference",
+      "swift": "String?",
+      "java": "String (may be null) / Optional<String> as return type",
+      "summary": "Any Java reference may be null; the type system won't help. Decide an explicit null strategy for every Swift optional.",
+      "risk": "high",
+      "detect": [
+        ":\\s*[A-Z][\\w<>\\[\\]\\., ]*\\?(?![?.])",
+        "\\bnil\\b"
+      ],
+      "swiftExample": "var name: String? = nil",
+      "javaExample": "String name = null;   // nothing in the type says this can be null",
+      "gotchas": [
+        "Non-optional Swift values have no Java guarantee either: fields default to null.",
+        "Convention: Optional<T> mainly as a return type, not for fields or parameters."
+      ],
+      "related": [
+        "optional-binding",
+        "nil-coalescing",
+        "optional-chaining",
+        "force-unwrap",
+        "optional-return"
+      ],
+      "tags": [
+        "optionals",
+        "null-safety"
+      ],
+      "since": null
+    },
+    {
+      "id": "optional-binding",
+      "category": "data-types",
+      "title": "if let / guard let → null check",
+      "swift": "if let x { } / guard let x else { return }",
+      "java": "if (x != null) { } / if (x == null) return;",
+      "summary": "Optional binding becomes an explicit null check; guard let becomes an early return.",
+      "risk": "medium",
+      "detect": [
+        "\\b(if|guard|while)\\s+(let|var)\\b"
+      ],
+      "swiftExample": "guard let user = user else { return }\nif let name { print(name) }",
+      "javaExample": "if (user == null) {\n    return;\n}\nif (name != null) { System.out.println(name); }",
+      "gotchas": [
+        "`if let x = x` shadows; in Java just reuse the variable — redeclaring a local is a compile error.",
+        "For Optional<T> values: x.ifPresent(v -> …)."
+      ],
+      "related": [
+        "optional-type",
+        "variable-shadowing",
+        "type-cast-binding"
+      ],
+      "tags": [
+        "optionals",
+        "null-safety",
+        "control-flow"
+      ],
+      "since": null
+    },
+    {
+      "id": "nil-coalescing",
+      "category": "data-types",
+      "title": "?? → requireNonNullElse / orElse",
+      "swift": "x ?? fallback",
+      "java": "Objects.requireNonNullElse(x, fallback) / opt.orElse(fallback)",
+      "summary": "Nil-coalescing becomes a ternary, Objects.requireNonNullElse, or Optional.orElse / orElseGet.",
+      "risk": "low",
+      "detect": [
+        "\\?\\?"
+      ],
+      "swiftExample": "let display = name ?? \"Unknown\"",
+      "javaExample": "String display = Objects.requireNonNullElse(name, \"Unknown\");\n// Optional: findUser(id).map(User::name).orElse(\"Unknown\");",
+      "gotchas": [
+        "orElse(expr) always evaluates expr; use orElseGet(() -> expr) for expensive fallbacks."
+      ],
+      "related": [
+        "optional-type",
+        "optional-return"
+      ],
+      "tags": [
+        "optionals"
+      ],
+      "since": null
+    },
+    {
+      "id": "optional-chaining",
+      "category": "data-types",
+      "title": "Optional chaining x?.y → null checks / Optional.map",
+      "swift": "user?.address?.city",
+      "java": "Optional.ofNullable(user).map(User::address).map(Address::city)",
+      "summary": "There is no ?. operator. Use explicit null checks or chain Optional.map.",
+      "risk": "medium",
+      "detect": [
+        "\\w\\?\\.\\w"
+      ],
+      "swiftExample": "let city = user?.address?.city",
+      "javaExample": "String city = Optional.ofNullable(user)\n        .map(User::address)\n        .map(Address::city)\n        .orElse(null);",
+      "gotchas": [
+        "Calling a method on null throws NullPointerException; nothing short-circuits automatically."
+      ],
+      "related": [
+        "optional-type",
+        "method-references"
+      ],
+      "tags": [
+        "optionals",
+        "null-safety"
+      ],
+      "since": null
+    },
+    {
+      "id": "force-unwrap",
+      "category": "data-types",
+      "title": "Force unwrap x! → orElseThrow / requireNonNull",
+      "swift": "x!",
+      "java": "opt.orElseThrow() / Objects.requireNonNull(x)",
+      "summary": "Force unwrap becomes orElseThrow() on Optional, or Objects.requireNonNull for plain references.",
+      "risk": "medium",
+      "detect": [
+        "[\\w)\\]]!(?=[\\s.)\\],;]|$)"
+      ],
+      "swiftExample": "let user = findUser(id)!",
+      "javaExample": "User user = findUser(id).orElseThrow();\nUser u2 = Objects.requireNonNull(maybeUser, \"user\");",
+      "gotchas": [
+        "Dereferencing null already throws NPE, but requireNonNull fails earlier with a clearer message."
+      ],
+      "related": [
+        "optional-type"
+      ],
+      "tags": [
+        "optionals"
+      ],
+      "since": null
+    },
+    {
+      "id": "optional-return",
+      "category": "data-types",
+      "title": "Function returning T? → Optional<T>",
+      "swift": "func findUser(id: String) -> User?",
+      "java": "Optional<User> findUser(String id)",
+      "summary": "By convention Java uses Optional<T> mainly for return values that may be absent.",
+      "risk": "medium",
+      "detect": [
+        "->\\s*[\\w<>\\[\\]\\.]+\\?\\s*(\\{|$|where)"
+      ],
+      "swiftExample": "func findUser(id: String) -> User?",
+      "javaExample": "Optional<User> findUser(String id) { ... }\n\nString display = findUser(id)\n        .map(User::name)\n        .orElse(\"Unknown\");",
+      "gotchas": [
+        "x?.foo → x.map(X::foo); x ?? y → x.orElse(y); x! → x.orElseThrow(); x == nil → x.isEmpty().",
+        "Never return null from a method declared to return Optional."
+      ],
+      "related": [
+        "optional-type",
+        "failable-init"
+      ],
+      "tags": [
+        "optionals",
+        "api-design"
+      ],
+      "since": null
+    },
+    {
+      "id": "tuples",
+      "category": "data-types",
+      "title": "Tuples → record",
+      "swift": "(min: Int, max: Int)",
+      "java": "record MinMax(int min, int max) {}",
+      "summary": "Java has no tuples. Declare a small record for multiple return values.",
+      "risk": "medium",
+      "detect": [
+        "->\\s*\\(\\s*\\w+\\s*:",
+        "->\\s*\\(\\s*[A-Z]\\w*\\s*,"
+      ],
+      "swiftExample": "func minMax() -> (min: Int, max: Int)",
+      "javaExample": "record MinMax(int min, int max) {}\nMinMax minMax() { ... }",
+      "gotchas": [
+        "Map.entry(k, v) is a common stand-in for ad-hoc pairs."
+      ],
+      "related": [
+        "struct-to-record"
+      ],
+      "tags": [
+        "records"
+      ],
+      "since": null
+    },
+    {
+      "id": "simple-enum",
+      "category": "data-types",
+      "title": "enum → enum (with fields and methods)",
+      "swift": "enum Planet { case mercury, earth }",
+      "java": "enum Planet { MERCURY, EARTH }",
+      "summary": "Simple enums map directly; Java enum constants are UPPER_SNAKE_CASE and can carry fields, constructors and methods.",
+      "risk": "low",
+      "detect": [
+        "^[ \\t]*(\\w+[ \\t]+)*enum[ \\t]+\\w+"
+      ],
+      "swiftExample": "enum Planet: Double {\n    case mercury = 3.303e23, earth = 5.976e24\n}",
+      "javaExample": "enum Planet {\n    MERCURY(3.303e23), EARTH(5.976e24);\n\n    private final double mass;\n    Planet(double mass) { this.mass = mass; }\n    double mass() { return mass; }\n}",
+      "gotchas": [
+        "Raw values become constructor arguments + a field.",
+        "Enums with associated values need a sealed interface instead."
+      ],
+      "related": [
+        "enum-associated-values",
+        "switch-arrow"
+      ],
+      "tags": [
+        "enums"
+      ],
+      "since": null
+    },
+    {
+      "id": "enum-associated-values",
+      "category": "data-types",
+      "title": "Enum with associated values → sealed interface + records",
+      "swift": "enum Shape { case circle(radius: Double) }",
+      "java": "sealed interface Shape permits Circle, Rect {}",
+      "summary": "Each case with associated values becomes a record implementing a sealed interface; switch over it exhaustively.",
+      "risk": "medium",
+      "detect": [
+        "^[ \\t]*case[ \\t]+\\w+[ \\t]*\\("
+      ],
+      "swiftExample": "enum Shape {\n    case circle(radius: Double)\n    case rect(w: Double, h: Double)\n}",
+      "javaExample": "sealed interface Shape permits Circle, Rect {}\nrecord Circle(double radius) implements Shape {}\nrecord Rect(double w, double h) implements Shape {}",
+      "gotchas": [
+        "Pattern-matching switch (Java 21) is exhaustive over sealed types, so no default branch is needed."
+      ],
+      "related": [
+        "switch-patterns",
+        "sealed-hierarchies",
+        "simple-enum"
+      ],
+      "tags": [
+        "enums",
+        "sealed",
+        "records"
+      ],
+      "since": "Java 21"
+    },
+    {
+      "id": "struct-to-record",
+      "category": "data-types",
+      "title": "struct → record (reference type!)",
+      "swift": "struct Point { let x: Int; let y: Int }",
+      "java": "record Point(int x, int y) {}",
+      "summary": "Structs usually become records: immutable, with generated equals/hashCode/toString. Records are still references; value semantics come from immutability, not copying.",
+      "risk": "high",
+      "detect": [
+        "\\bstruct\\s+\\w+"
+      ],
+      "swiftExample": "struct Point { let x: Int; let y: Int }\nvar b = a; b.x = 5   // a unchanged",
+      "javaExample": "record Point(int x, int y) {}\nPoint b = a;           // same object, no copy\nPoint moved = new Point(5, a.y());   // 'mutate' by creating a new one",
+      "gotchas": [
+        "Mutable structs have no Java equivalent: copy explicitly or make the type immutable.",
+        "Record accessors have no get prefix: point.x().",
+        "Validate in a compact constructor: record Range(int lo, int hi) { Range { if (lo > hi) throw … } }"
+      ],
+      "related": [
+        "tuples",
+        "equatable-hashable",
+        "collection-types"
+      ],
+      "tags": [
+        "records",
+        "value-semantics"
+      ],
+      "since": null
+    },
+    {
+      "id": "equality-operator",
+      "category": "strings",
+      "title": "String/object equality: == → .equals()",
+      "swift": "a == b (value equality)",
+      "java": "a.equals(b) / Objects.equals(a, b)",
+      "summary": "In Java, == compares references for objects (including String and Integer). Use equals() for value equality. This is the #1 bug for Swift developers.",
+      "risk": "high",
+      "detect": [
+        "[^=!<>]==[^=]",
+        "!=(?!=)"
+      ],
+      "swiftExample": "if input == \"hi\" { }",
+      "javaExample": "String a = \"hi\";\nString b = new String(\"hi\");\na == b;               // false: compares references\na.equals(b);          // true\n\"hi\".equals(input);   // null-safe idiom\nObjects.equals(a, b); // null-safe for both",
+      "gotchas": [
+        "== is fine for primitives (int, double, boolean) and enum constants.",
+        "Arrays: a.equals(b) also compares references; use Arrays.equals."
+      ],
+      "related": [
+        "boxed-types",
+        "equatable-hashable"
+      ],
+      "tags": [
+        "equality",
+        "strings"
+      ],
+      "since": null
+    },
+    {
+      "id": "string-interpolation",
+      "category": "strings",
+      "title": "String interpolation → formatted() / concatenation",
+      "swift": "\"Hello \\(name)\"",
+      "java": "\"Hello %s\".formatted(name)",
+      "summary": "Java has no stable string interpolation (the string templates preview was withdrawn). Use concatenation, String.format or .formatted().",
+      "risk": "low",
+      "detect": [
+        "\\\\\\("
+      ],
+      "swiftExample": "let msg = \"Hello \\(name), you are \\(age) years old\"",
+      "javaExample": "String msg = \"Hello \" + name + \", you are \" + age + \" years old\";\nString msg2 = \"Hello %s, you are %d years old\".formatted(name, age);",
+      "gotchas": [
+        "Specifiers: %s string, %d integer, %.2f 2 decimals, %n newline, %x hex, %,d grouping."
+      ],
+      "related": [
+        "multiline-strings"
+      ],
+      "tags": [
+        "strings",
+        "formatting"
+      ],
+      "since": null
+    },
+    {
+      "id": "multiline-strings",
+      "category": "strings",
+      "title": "Multi-line string → text block",
+      "swift": "\"\"\" … \"\"\"",
+      "java": "\"\"\" … \"\"\" (text block)",
+      "summary": "Text blocks work like Swift multi-line strings; the closing delimiter position sets stripped indentation.",
+      "risk": "low",
+      "detect": [
+        "\\\"\\\"\\\""
+      ],
+      "swiftExample": "let json = \"\"\"\n    { \"name\": \"\\(name)\" }\n    \"\"\"",
+      "javaExample": "String json = \"\"\"\n        { \"name\": \"%s\" }\n        \"\"\".formatted(name);",
+      "gotchas": [
+        "No interpolation inside text blocks; combine with .formatted()."
+      ],
+      "related": [
+        "string-interpolation"
+      ],
+      "tags": [
+        "strings"
+      ],
+      "since": null
+    },
+    {
+      "id": "string-building",
+      "category": "strings",
+      "title": "Repeated += / joined → StringBuilder / String.join",
+      "swift": "items.joined(separator: \", \")",
+      "java": "String.join(\", \", items)",
+      "summary": "Strings are immutable. Use String.join or Collectors.joining; use StringBuilder for loops of appends.",
+      "risk": "low",
+      "detect": [
+        "\\.joined\\s*\\("
+      ],
+      "swiftExample": "let result = items.joined(separator: \", \")",
+      "javaExample": "String joined = String.join(\", \", items);\n\nvar sb = new StringBuilder();\nfor (String item : items) sb.append(item).append(\", \");\nString result = sb.toString();",
+      "gotchas": [],
+      "related": [
+        "stream-collectors"
+      ],
+      "tags": [
+        "strings",
+        "performance"
+      ],
+      "since": null
+    },
+    {
+      "id": "string-length",
+      "category": "strings",
+      "title": "count / String.Index → length() / charAt (UTF-16)",
+      "swift": "s.count, s[s.startIndex]",
+      "java": "s.length(), s.charAt(0)",
+      "summary": "Swift counts grapheme clusters; Java length() counts UTF-16 code units. Java allows direct integer indexing.",
+      "risk": "medium",
+      "detect": [
+        "String\\.Index",
+        "\\.(startIndex|endIndex|unicodeScalars|utf16)\\b",
+        "\\.index\\s*\\("
+      ],
+      "swiftExample": "let first = s[s.startIndex]   // String.Index, not Int\n\"👍\".count                   // 1",
+      "javaExample": "\"👍\".length();               // 2 (surrogate pair)\n\"👍\".codePointCount(0, 2);   // 1\ns.charAt(0);                 // direct integer indexing",
+      "gotchas": [
+        "Iterate real characters with s.codePoints()."
+      ],
+      "related": [
+        "character-utf16",
+        "string-methods"
+      ],
+      "tags": [
+        "strings",
+        "unicode"
+      ],
+      "since": null
+    },
+    {
+      "id": "string-methods",
+      "category": "strings",
+      "title": "String method mapping",
+      "swift": "uppercased(), hasPrefix, trimmingCharacters…",
+      "java": "toUpperCase(), startsWith, strip()…",
+      "summary": "Most String methods have direct Java counterparts with different names.",
+      "risk": "low",
+      "detect": [
+        "\\b(uppercased|lowercased|hasPrefix|hasSuffix|trimmingCharacters|replacingOccurrences)\\s*\\(",
+        "\\.reversed\\s*\\(\\s*\\)",
+        "String\\(repeating:"
+      ],
+      "swiftExample": "s.uppercased(); s.hasPrefix(\"a\"); s.trimmingCharacters(in: .whitespaces)",
+      "javaExample": "s.toUpperCase(); s.startsWith(\"a\"); s.strip();",
+      "gotchas": [
+        "count → length(); isEmpty → isEmpty() (isBlank() for whitespace-only)",
+        "lowercased() → toLowerCase(); hasSuffix → endsWith",
+        "replacingOccurrences(of:with:) → replace(a, b) (replaceAll takes a regex)",
+        "String(repeating: \"-\", count: 3) → \"-\".repeat(3)",
+        "reversed() → new StringBuilder(s).reverse().toString()",
+        "String(42) → String.valueOf(42)"
+      ],
+      "related": [
+        "string-split-regex",
+        "string-parse-number",
+        "string-length"
+      ],
+      "tags": [
+        "strings"
+      ],
+      "since": null
+    },
+    {
+      "id": "string-split-regex",
+      "category": "strings",
+      "title": "split / components(separatedBy:) → split (regex!)",
+      "swift": "s.split(separator: \",\")",
+      "java": "s.split(\",\") — argument is a regex",
+      "summary": "Java's String.split takes a regular expression and drops trailing empty strings by default.",
+      "risk": "high",
+      "detect": [
+        "\\.split\\s*\\(",
+        "components\\s*\\(\\s*separatedBy"
+      ],
+      "swiftExample": "let parts = version.components(separatedBy: \".\")",
+      "javaExample": "String[] parts = version.split(\"\\\\.\");    // '.' must be escaped\nString[] all = csv.split(\",\", -1);       // -1 keeps trailing empties",
+      "gotchas": [
+        "split(\".\") splits on every character and returns an empty array.",
+        "Pattern.quote(sep) escapes an arbitrary literal separator."
+      ],
+      "related": [
+        "string-methods"
+      ],
+      "tags": [
+        "strings",
+        "regex"
+      ],
+      "since": null
+    },
+    {
+      "id": "string-parse-number",
+      "category": "strings",
+      "title": "Int(\"42\") → Integer.parseInt (throws)",
+      "swift": "Int(\"42\") returns Int?",
+      "java": "Integer.parseInt(\"42\") throws NumberFormatException",
+      "summary": "Parsing returns an optional in Swift but throws an unchecked NumberFormatException in Java.",
+      "risk": "high",
+      "detect": [
+        "\\b(Int|Double|Float|Int64)\\s*\\(\\s*(\\\"|[a-z]\\w*\\s*\\))"
+      ],
+      "swiftExample": "let n = Int(text) ?? 0",
+      "javaExample": "int n;\ntry {\n    n = Integer.parseInt(text);\n} catch (NumberFormatException e) {\n    n = 0;\n}",
+      "gotchas": [
+        "Long.parseLong, Double.parseDouble behave the same.",
+        "Integer.parseInt(null) also throws NumberFormatException."
+      ],
+      "related": [
+        "try-optional",
+        "string-methods"
+      ],
+      "tags": [
+        "strings",
+        "parsing",
+        "exceptions"
+      ],
+      "since": null
+    },
+    {
+      "id": "closure-syntax",
+      "category": "lambdas",
+      "title": "Closure syntax → lambda syntax",
+      "swift": "{ (a: Int, b: Int) -> Int in a + b }",
+      "java": "(a, b) -> a + b",
+      "summary": "Lambdas use (params) -> body. Types are inferred from the target functional interface; block bodies need explicit return.",
+      "risk": "low",
+      "detect": [
+        "\\{\\s*\\(?[\\w\\s,:<>\\[\\]?]*\\)?\\s*(->\\s*[\\w<>\\[\\]?]+\\s*)?\\bin\\b"
+      ],
+      "swiftExample": "{ (a: Int, b: Int) -> Int in a + b }\n{ a, b in a + b }",
+      "javaExample": "(int a, int b) -> a + b\n(a, b) -> a + b\nx -> x * 2\n() -> 42\n(a, b) -> {\n    int sum = a + b;\n    return sum * 2;\n}",
+      "gotchas": [
+        "The lambda always goes inside the parentheses: no trailing closures."
+      ],
+      "related": [
+        "shorthand-args",
+        "function-types",
+        "trailing-closures"
+      ],
+      "tags": [
+        "lambdas",
+        "syntax"
+      ],
+      "since": null
+    },
+    {
+      "id": "shorthand-args",
+      "category": "lambdas",
+      "title": "$0, $1 → named parameters",
+      "swift": "{ $0 + $1 }",
+      "java": "(a, b) -> a + b",
+      "summary": "There is no $0 shorthand; every lambda parameter must be named. Unused parameters can be _ in Java 22+.",
+      "risk": "low",
+      "detect": [
+        "\\$\\d"
+      ],
+      "swiftExample": "items.map { $0 * 2 }",
+      "javaExample": "items.stream().map(x -> x * 2).toList();\nmap.forEach((_, value) -> System.out.println(value));   // Java 22+",
+      "gotchas": [
+        "For `{ $0.name }`, prefer a method reference: Person::name."
+      ],
+      "related": [
+        "closure-syntax",
+        "method-references"
+      ],
+      "tags": [
+        "lambdas",
+        "syntax"
+      ],
+      "since": null
+    },
+    {
+      "id": "closure-capture-mutation",
+      "category": "lambdas",
+      "title": "Mutating captured variables → effectively final only",
+      "swift": "var counter = 0; items.forEach { _ in counter += 1 }",
+      "java": "AtomicInteger, or avoid mutation",
+      "summary": "Java lambdas can only capture local variables that are final or effectively final. Fields can still be mutated.",
+      "risk": "high",
+      "detect": [
+        "\\{[^{}]*\\bin\\b[^{}]*\\b\\w+\\s*([+\\-*/]=|=\\s)",
+        "\\{[^{}]*\\$\\d[^{}]*\\b\\w+\\s*[+\\-*/]="
+      ],
+      "swiftExample": "var counter = 0\nitems.forEach { _ in counter += 1 }",
+      "javaExample": "int counter = 0;\nitems.forEach(i -> counter++);        // compile error\n\nvar counter = new AtomicInteger();\nitems.forEach(i -> counter.incrementAndGet());\nlong count = items.stream().count();  // better: no mutation",
+      "gotchas": [
+        "this.field++ inside a lambda is allowed; only locals are restricted."
+      ],
+      "related": [
+        "closure-syntax",
+        "stream-basics"
+      ],
+      "tags": [
+        "lambdas",
+        "closures",
+        "capture"
+      ],
+      "since": null
+    },
+    {
+      "id": "weak-self-capture",
+      "category": "lambdas",
+      "title": "[weak self] capture lists → not needed",
+      "swift": "{ [weak self] in self?.reload() }",
+      "java": "() -> reload()",
+      "summary": "this in a lambda is the enclosing instance. Cycles don't leak under GC, so capture lists have no equivalent.",
+      "risk": "low",
+      "detect": [
+        "\\[\\s*(weak|unowned)\\s+self\\s*\\]",
+        "\\[\\s*(weak|unowned)\\s+\\w+"
+      ],
+      "swiftExample": "api.load { [weak self] data in self?.show(data) }",
+      "javaExample": "api.load(data -> show(data));",
+      "gotchas": [],
+      "related": [
+        "arc-vs-gc",
+        "lambda-vs-anonymous-class"
+      ],
+      "tags": [
+        "lambdas",
+        "memory"
+      ],
+      "since": null
+    },
+    {
+      "id": "trailing-closures",
+      "category": "lambdas",
+      "title": "@escaping / trailing closures → lambda inside parentheses",
+      "swift": "animate(withDuration: 0.3) { view.alpha = 0 }",
+      "java": "animate(0.3, () -> view.setAlpha(0));",
+      "summary": "Every Java lambda may escape, and there's no trailing-closure syntax.",
+      "risk": "low",
+      "detect": [
+        "@escaping",
+        "^(?![ \\t]*(\\}|func|init|if|guard|while|for|switch|else|catch|do|class|struct|enum|extension|protocol|actor|private|public|internal|fileprivate|open|static|override|mutating|convenience|required|final|@)\\b)[^\\n]*\\w\\)[ \\t]*\\{[^{}\\n]*\\}",
+        "^(?![ \\t]*(\\}|func|init|if|guard|while|for|switch|else|catch|do|class|struct|enum|extension|protocol|actor|private|public|internal|fileprivate|open|static|override|mutating|convenience|required|final|@)\\b)[^\\n]*(\\w\\)|\\.\\w+)[ \\t]*\\{[ \\t]*(\\[[^\\]\\n]*\\][ \\t]*)?(\\w+([ \\t]*,[ \\t]*\\w+)*[ \\t]+in)?[ \\t]*$"
+      ],
+      "swiftExample": "UIView.animate(withDuration: 0.3) { view.alpha = 0 }",
+      "javaExample": "animate(0.3, () -> view.setAlpha(0));",
+      "gotchas": [],
+      "related": [
+        "closure-syntax"
+      ],
+      "tags": [
+        "lambdas",
+        "syntax"
+      ],
+      "since": null
+    },
+    {
+      "id": "function-types",
+      "category": "lambdas",
+      "title": "Function types → functional interfaces",
+      "swift": "(Int) -> Int",
+      "java": "Function<Integer, Integer>",
+      "summary": "Java has no function types. A lambda implements a functional interface and you call its method (apply, accept, test, get, run).",
+      "risk": "medium",
+      "detect": [
+        ":\\s*(@escaping\\s+)?\\(?\\([^()]*\\)\\s*(throws\\s+)?->"
+      ],
+      "swiftExample": "let square: (Int) -> Int = { $0 * $0 }\nsquare(4)",
+      "javaExample": "Function<Integer, Integer> square = x -> x * x;\nsquare.apply(4);    // square(4) won't compile",
+      "gotchas": [
+        "() -> Void → Runnable.run()",
+        "() -> T → Supplier<T>.get()",
+        "(T) -> Void → Consumer<T>.accept(t)",
+        "(T, U) -> Void → BiConsumer<T, U>.accept(t, u)",
+        "(T) -> R → Function<T, R>.apply(t)",
+        "(T, U) -> R → BiFunction<T, U, R>.apply(t, u)",
+        "(T) -> Bool → Predicate<T>.test(t)",
+        "(T) -> T → UnaryOperator<T>",
+        "(T, T) -> T → BinaryOperator<T>",
+        "(T, T) -> Bool (sort) → Comparator<T>.compare(a, b) returns int",
+        "() throws -> T → Callable<T>.call()",
+        "Primitive variants avoid boxing: IntFunction, ToIntFunction, IntPredicate, IntUnaryOperator…",
+        "3+ parameters or checked exceptions → declare your own @FunctionalInterface."
+      ],
+      "related": [
+        "closure-syntax",
+        "optional-callback",
+        "throwing-closures",
+        "compose-lambdas"
+      ],
+      "tags": [
+        "lambdas",
+        "functional-interfaces"
+      ],
+      "since": null
+    },
+    {
+      "id": "optional-callback",
+      "category": "lambdas",
+      "title": "Optional closure property → Consumer field + null check",
+      "swift": "var onComplete: ((Result) -> Void)?",
+      "java": "private Consumer<Result> onComplete;",
+      "summary": "Store callbacks as functional-interface fields and null-check before calling.",
+      "risk": "low",
+      "detect": [
+        "\\(\\([^()]*\\)\\s*->\\s*\\w+\\)\\?"
+      ],
+      "swiftExample": "var onComplete: ((Result) -> Void)?\nonComplete?(result)",
+      "javaExample": "private Consumer<Result> onComplete;\npublic void setOnComplete(Consumer<Result> handler) { this.onComplete = handler; }\nif (onComplete != null) onComplete.accept(result);",
+      "gotchas": [],
+      "related": [
+        "function-types"
+      ],
+      "tags": [
+        "lambdas",
+        "callbacks"
+      ],
+      "since": null
+    },
+    {
+      "id": "method-references",
+      "category": "lambdas",
+      "title": "Key paths / { $0.name } → method references",
+      "swift": "people.map(\\.name)",
+      "java": "people.stream().map(Person::name)",
+      "summary": "Method references are shorthand for lambdas that only call an existing method.",
+      "risk": "low",
+      "detect": [
+        "\\(\\s*\\\\\\.\\w+",
+        "\\{\\s*\\$0\\.\\w+\\s*\\}"
+      ],
+      "swiftExample": "let names = people.map(\\.name)",
+      "javaExample": "List<String> names = people.stream().map(Person::name).toList();",
+      "gotchas": [
+        "Static: Integer::parseInt",
+        "Bound instance: System.out::println",
+        "Instance of the parameter: String::toUpperCase",
+        "Constructor: ArrayList::new"
+      ],
+      "related": [
+        "shorthand-args",
+        "stream-basics"
+      ],
+      "tags": [
+        "lambdas",
+        "syntax"
+      ],
+      "since": null
+    },
+    {
+      "id": "compose-lambdas",
+      "category": "lambdas",
+      "title": "Returning and composing functions",
+      "swift": "func multiplier(_ f: Int) -> (Int) -> Int",
+      "java": "static Function<Integer, Integer> multiplier(int f)",
+      "summary": "Return lambdas from methods and compose them with andThen / compose / and / negate.",
+      "risk": "low",
+      "detect": [
+        "->\\s*\\(\\s*[\\w<>\\[\\]?]*\\s*\\)\\s*->"
+      ],
+      "swiftExample": "func multiplier(_ factor: Int) -> (Int) -> Int { { $0 * factor } }",
+      "javaExample": "static Function<Integer, Integer> multiplier(int factor) {\n    return x -> x * factor;\n}\ntriple.andThen(plusOne).apply(5);   // (5 * 3) + 1 = 16\nnotEmpty.and(shortWord).test(\"hi\");",
+      "gotchas": [
+        "A lambda cannot be generic itself; use a generic method.",
+        "A lambda can't easily call itself recursively; use a method."
+      ],
+      "related": [
+        "function-types"
+      ],
+      "tags": [
+        "lambdas",
+        "functional"
+      ],
+      "since": null
+    },
+    {
+      "id": "lambda-vs-anonymous-class",
+      "category": "lambdas",
+      "title": "Anonymous classes (legacy code)",
+      "swift": "(n/a)",
+      "java": "new Runnable() { public void run() { … } }",
+      "summary": "Older Java code uses anonymous classes where you'd now write a lambda. Inside an anonymous class, this is the anonymous object.",
+      "risk": "low",
+      "detect": [],
+      "swiftExample": null,
+      "javaExample": "Runnable r = new Runnable() {\n    @Override public void run() { System.out.println(\"old style\"); }\n};\nRunnable r2 = () -> System.out.println(\"lambda\");",
+      "gotchas": [],
+      "related": [
+        "closure-syntax"
+      ],
+      "tags": [
+        "lambdas",
+        "legacy"
+      ],
+      "since": null
+    },
+    {
+      "id": "if-statement",
+      "category": "control-flow",
+      "title": "if → if (parentheses required)",
+      "swift": "if score > 90 { }",
+      "java": "if (score > 90) { }",
+      "summary": "Conditions need parentheses and must be boolean. Braces are optional but strongly recommended.",
+      "risk": "low",
+      "detect": [
+        "^[ \\t]*(\\}[ \\t]*else[ \\t]+)?if[ \\t]+(?!let\\b|var\\b|case\\b)[^({\\n]"
+      ],
+      "swiftExample": "if score > 90 { grade = \"A\" } else if score > 80 { grade = \"B\" }",
+      "javaExample": "if (score > 90) {\n    grade = \"A\";\n} else if (score > 80) {\n    grade = \"B\";\n}",
+      "gotchas": [
+        "Ternary is identical: isOn ? \"On\" : \"Off\"."
+      ],
+      "related": [
+        "optional-binding"
+      ],
+      "tags": [
+        "control-flow",
+        "syntax"
+      ],
+      "since": null
+    },
+    {
+      "id": "guard-statement",
+      "category": "control-flow",
+      "title": "guard … else → inverted if + early return",
+      "swift": "guard count > 0 else { return }",
+      "java": "if (count <= 0) { return; }",
+      "summary": "guard becomes an if with the inverted condition and an early exit.",
+      "risk": "low",
+      "detect": [
+        "\\bguard\\s+(?!let\\b|var\\b)"
+      ],
+      "swiftExample": "guard count > 0 else { return }",
+      "javaExample": "if (count <= 0) {\n    return;\n}",
+      "gotchas": [],
+      "related": [
+        "optional-binding"
+      ],
+      "tags": [
+        "control-flow"
+      ],
+      "since": null
+    },
+    {
+      "id": "type-cast-binding",
+      "category": "control-flow",
+      "title": "as? / is → instanceof pattern matching",
+      "swift": "if let c = shape as? Circle { }",
+      "java": "if (shape instanceof Circle c) { }",
+      "summary": "Type-check-and-bind uses pattern matching for instanceof.",
+      "risk": "medium",
+      "detect": [
+        "\\bas\\?",
+        "\\bas!",
+        "\\bis\\s+[A-Z]\\w*"
+      ],
+      "swiftExample": "if let c = shape as? Circle { print(c.radius) }",
+      "javaExample": "if (shape instanceof Circle c) {\n    System.out.println(c.radius());\n}",
+      "gotchas": [
+        "as! → a plain cast (Circle) shape, which throws ClassCastException on failure."
+      ],
+      "related": [
+        "switch-patterns"
+      ],
+      "tags": [
+        "control-flow",
+        "casting",
+        "pattern-matching"
+      ],
+      "since": null
+    },
+    {
+      "id": "switch-arrow",
+      "category": "control-flow",
+      "title": "switch → arrow-form switch (no fallthrough)",
+      "swift": "switch day { case .saturday, .sunday: … }",
+      "java": "switch (day) { case SATURDAY, SUNDAY -> … }",
+      "summary": "Use the arrow form. The old colon form falls through unless you break.",
+      "risk": "medium",
+      "detect": [
+        "\\bswitch\\b"
+      ],
+      "swiftExample": "switch day {\ncase .saturday, .sunday: print(\"Weekend\")\ndefault: print(\"Weekday\")\n}",
+      "javaExample": "switch (day) {\n    case SATURDAY, SUNDAY -> System.out.println(\"Weekend\");\n    default -> System.out.println(\"Weekday\");\n}",
+      "gotchas": [
+        "case X: (colon) silently falls into the next case without break.",
+        "Switch over enums: write the bare constant name (SATURDAY), not Day.SATURDAY."
+      ],
+      "related": [
+        "switch-expression",
+        "switch-patterns"
+      ],
+      "tags": [
+        "control-flow",
+        "switch"
+      ],
+      "since": null
+    },
+    {
+      "id": "switch-expression",
+      "category": "control-flow",
+      "title": "let x = switch → switch expression with yield",
+      "swift": "let type = switch day { … }",
+      "java": "String type = switch (day) { … };",
+      "summary": "Switch can be an expression. Use yield to return a value from a block branch.",
+      "risk": "low",
+      "detect": [
+        "=\\s*switch\\b"
+      ],
+      "swiftExample": "let type = switch day {\ncase .saturday, .sunday: \"Weekend\"\ndefault: \"Weekday\"\n}",
+      "javaExample": "String type = switch (day) {\n    case SATURDAY, SUNDAY -> \"Weekend\";\n    default -> {\n        log(\"weekday\");\n        yield \"Weekday\";\n    }\n};",
+      "gotchas": [],
+      "related": [
+        "switch-arrow"
+      ],
+      "tags": [
+        "control-flow",
+        "switch"
+      ],
+      "since": null
+    },
+    {
+      "id": "switch-patterns",
+      "category": "control-flow",
+      "title": "switch on associated values → record patterns + when",
+      "swift": "case .circle(let r): … / case … where",
+      "java": "case Circle c -> … / case Rect r when …",
+      "summary": "Pattern-matching switch over a sealed type is exhaustive; when is Swift's where; records can be deconstructed.",
+      "risk": "medium",
+      "detect": [
+        "case\\s+\\.?\\w+\\s*\\(\\s*(let|var)\\b",
+        "case\\s+(let|var)\\s+\\.",
+        "^[ \\t]*case\\b[^:\\n]*\\bwhere\\b"
+      ],
+      "swiftExample": "switch shape {\ncase .circle(let r): return .pi * r * r\ncase .rect(let w, let h) where w == h: return w * w\ncase .rect(let w, let h): return w * h\n}",
+      "javaExample": "double area = switch (shape) {\n    case Circle c -> Math.PI * c.radius() * c.radius();\n    case Rect r when r.w() == r.h() -> r.w() * r.w();\n    case Rect(double w, double h) -> w * h;\n};   // no default: Shape is sealed",
+      "gotchas": [],
+      "related": [
+        "enum-associated-values",
+        "sealed-hierarchies"
+      ],
+      "tags": [
+        "control-flow",
+        "pattern-matching",
+        "sealed"
+      ],
+      "since": "Java 21"
+    },
+    {
+      "id": "range-loops",
+      "category": "control-flow",
+      "title": "for i in 0..<n → classic for / IntStream.range",
+      "swift": "for i in 0..<n",
+      "java": "for (int i = 0; i < n; i++)",
+      "summary": "Ranges become index loops, or IntStream.range (exclusive) / rangeClosed (inclusive).",
+      "risk": "low",
+      "detect": [
+        "\\.\\.<",
+        "\\w\\s*\\.\\.\\.\\s*\\w"
+      ],
+      "swiftExample": "for i in 0..<n { }\nfor i in 0...n { }",
+      "javaExample": "for (int i = 0; i < n; i++) { }\nfor (int i = 0; i <= n; i++) { }\nIntStream.range(0, n).forEach(i -> ...);",
+      "gotchas": [],
+      "related": [
+        "stride-loops",
+        "enumerated-loops"
+      ],
+      "tags": [
+        "control-flow",
+        "loops"
+      ],
+      "since": null
+    },
+    {
+      "id": "stride-loops",
+      "category": "control-flow",
+      "title": "stride(from:to:by:) → for with step",
+      "swift": "for i in stride(from: 10, to: 0, by: -2)",
+      "java": "for (int i = 10; i > 0; i -= 2)",
+      "summary": "Strides become classic for loops with a custom step.",
+      "risk": "low",
+      "detect": [
+        "\\bstride\\s*\\("
+      ],
+      "swiftExample": "for i in stride(from: 10, to: 0, by: -2) { }",
+      "javaExample": "for (int i = 10; i > 0; i -= 2) { }",
+      "gotchas": [],
+      "related": [
+        "range-loops"
+      ],
+      "tags": [
+        "control-flow",
+        "loops"
+      ],
+      "since": null
+    },
+    {
+      "id": "enumerated-loops",
+      "category": "control-flow",
+      "title": "enumerated() → index loop",
+      "swift": "for (i, item) in items.enumerated()",
+      "java": "for (int i = 0; i < items.size(); i++)",
+      "summary": "There's no enumerated(); loop over indices.",
+      "risk": "low",
+      "detect": [
+        "\\.enumerated\\s*\\(\\s*\\)"
+      ],
+      "swiftExample": "for (i, item) in items.enumerated() { }",
+      "javaExample": "for (int i = 0; i < items.size(); i++) {\n    var item = items.get(i);\n}",
+      "gotchas": [],
+      "related": [
+        "range-loops"
+      ],
+      "tags": [
+        "control-flow",
+        "loops"
+      ],
+      "since": null
+    },
+    {
+      "id": "dictionary-loops",
+      "category": "control-flow",
+      "title": "for (k, v) in dict → entrySet()",
+      "swift": "for (key, value) in dict",
+      "java": "for (var e : map.entrySet())",
+      "summary": "Iterate a Map's entries, or use map.forEach((k, v) -> …).",
+      "risk": "low",
+      "detect": [
+        "for\\s*\\(\\s*\\w+\\s*,\\s*\\w+\\s*\\)\\s*in\\s+(?!.*enumerated)"
+      ],
+      "swiftExample": "for (name, age) in ages { print(name, age) }",
+      "javaExample": "for (var e : ages.entrySet()) {\n    System.out.println(e.getKey() + \" \" + e.getValue());\n}\nages.forEach((name, age) -> ...);",
+      "gotchas": [
+        "HashMap iteration order is unspecified (like Swift Dictionary). LinkedHashMap keeps insertion order."
+      ],
+      "related": [
+        "collection-types"
+      ],
+      "tags": [
+        "control-flow",
+        "loops",
+        "maps"
+      ],
+      "since": null
+    },
+    {
+      "id": "repeat-while",
+      "category": "control-flow",
+      "title": "repeat { } while → do { } while ();",
+      "swift": "repeat { } while cond",
+      "java": "do { } while (cond);",
+      "summary": "repeat-while is do-while, with a trailing semicolon.",
+      "risk": "low",
+      "detect": [
+        "\\brepeat\\s*\\{"
+      ],
+      "swiftExample": "repeat { attempt += 1 } while attempt < 3",
+      "javaExample": "do { attempt++; } while (attempt < 3);",
+      "gotchas": [],
+      "related": [],
+      "tags": [
+        "control-flow",
+        "loops"
+      ],
+      "since": null
+    },
+    {
+      "id": "defer",
+      "category": "control-flow",
+      "title": "defer → finally / try-with-resources",
+      "swift": "defer { file.close() }",
+      "java": "try { … } finally { file.close(); }",
+      "summary": "defer becomes a finally block; for resources prefer try-with-resources.",
+      "risk": "medium",
+      "detect": [
+        "\\bdefer\\s*\\{"
+      ],
+      "swiftExample": "defer { file.close() }",
+      "javaExample": "try {\n    // work\n} finally {\n    file.close();\n}\n\ntry (var reader = Files.newBufferedReader(path)) {\n    // use reader\n}",
+      "gotchas": [],
+      "related": [
+        "try-with-resources",
+        "deinit-autocloseable"
+      ],
+      "tags": [
+        "control-flow",
+        "resources"
+      ],
+      "since": null
+    },
+    {
+      "id": "class-declaration",
+      "category": "objects",
+      "title": "class → class (one public class per file)",
+      "swift": "class BankAccount { init(…) }",
+      "java": "public class BankAccount { BankAccount(…) }",
+      "summary": "Constructors are named after the class, new is required, and a public top-level class must live in a file of the same name.",
+      "risk": "medium",
+      "detect": [
+        "^[ \\t]*(\\w+[ \\t]+)*class[ \\t]+[A-Z]\\w*"
+      ],
+      "swiftExample": "class BankAccount {\n    let owner: String\n    private(set) var balance = 0.0\n    init(owner: String) { self.owner = owner }\n    func deposit(_ amount: Double) { balance += amount }\n}",
+      "javaExample": "public class BankAccount {\n    private final String owner;\n    private double balance;\n\n    public BankAccount(String owner) { this.owner = owner; }\n    public void deposit(double amount) { balance += amount; }\n    public double getBalance() { return balance; }\n}\nBankAccount acct = new BankAccount(\"Ana\");",
+      "gotchas": [
+        "Avoid calling overridable methods from constructors: subclass fields aren't set yet (no two-phase init).",
+        "Fields default to 0/false/null; Swift would have forced initialization."
+      ],
+      "related": [
+        "properties",
+        "open-by-default",
+        "init-chaining",
+        "field-defaults"
+      ],
+      "tags": [
+        "classes"
+      ],
+      "since": null
+    },
+    {
+      "id": "properties",
+      "category": "objects",
+      "title": "Properties → private fields + getters/setters",
+      "swift": "var name: String / var area: Double { w * h } / didSet",
+      "java": "private String name; getName()/setName(); getArea()",
+      "summary": "Java has no properties. Use private fields with getters/setters; computed properties become methods; didSet logic goes in the setter.",
+      "risk": "low",
+      "detect": [
+        "\\b(didSet|willSet)\\b",
+        "\\bvar\\s+\\w+\\s*:\\s*[\\w<>\\[\\]?]+\\s*\\{",
+        "private\\s*\\(\\s*set\\s*\\)"
+      ],
+      "swiftExample": "var area: Double { w * h }\nprivate(set) var count = 0\nvar name: String { didSet { save() } }",
+      "javaExample": "public double getArea() { return w * h; }\n\nprivate int count;\npublic int getCount() { return count; }\n\npublic void setName(String name) {\n    this.name = name;\n    save();\n}",
+      "gotchas": [
+        "Records use accessors without get: point.x()."
+      ],
+      "related": [
+        "class-declaration",
+        "struct-to-record"
+      ],
+      "tags": [
+        "classes",
+        "properties"
+      ],
+      "since": null
+    },
+    {
+      "id": "deinit-autocloseable",
+      "category": "objects",
+      "title": "deinit → AutoCloseable + try-with-resources",
+      "swift": "deinit { close() }",
+      "java": "implements AutoCloseable + try (var x = …) { }",
+      "summary": "There is no deinit and GC timing is unspecified. finalize() is deprecated. Implement AutoCloseable for deterministic cleanup.",
+      "risk": "high",
+      "detect": [
+        "\\bdeinit\\b"
+      ],
+      "swiftExample": "deinit { connection.close() }",
+      "javaExample": "public class Connection implements AutoCloseable {\n    @Override public void close() { /* release */ }\n}\ntry (var conn = new Connection()) {\n    // use conn\n}   // close() runs here",
+      "gotchas": [
+        "Never rely on GC to release files, sockets or locks."
+      ],
+      "related": [
+        "arc-vs-gc",
+        "try-with-resources",
+        "defer"
+      ],
+      "tags": [
+        "memory",
+        "resources",
+        "lifecycle"
+      ],
+      "since": null
+    },
+    {
+      "id": "static-members",
+      "category": "objects",
+      "title": "static let/func → static final / static; no class func",
+      "swift": "static let maxUsers = 100 / class func",
+      "java": "public static final int MAX_USERS = 100;",
+      "summary": "Constants are static final in UPPER_SNAKE_CASE. Statics are never polymorphic: there's no class func equivalent.",
+      "risk": "low",
+      "detect": [
+        "\\bstatic\\s+(let|var|func)\\b",
+        "\\bclass\\s+(func|var)\\b"
+      ],
+      "swiftExample": "static let maxUsers = 100\nstatic func create() -> Config",
+      "javaExample": "public static final int MAX_USERS = 100;\npublic static Config create() { ... }\nConfig.create();",
+      "gotchas": [
+        "class func (overridable static) → instance method or a strategy object."
+      ],
+      "related": [
+        "free-functions"
+      ],
+      "tags": [
+        "classes",
+        "static"
+      ],
+      "since": null
+    },
+    {
+      "id": "concurrency-primitives",
+      "category": "objects",
+      "title": "actors / locks / queues → volatile, synchronized, atomics",
+      "swift": "actor, NSLock, DispatchQueue, @MainActor",
+      "java": "volatile, synchronized, AtomicInteger, java.util.concurrent",
+      "summary": "volatile gives visibility (good for flags), not atomicity. Use Atomic* types or synchronized for compound operations.",
+      "risk": "high",
+      "detect": [
+        "\\bactor\\s+\\w+",
+        "\\bNSLock\\b",
+        "\\bDispatchQueue\\b",
+        "@MainActor",
+        "\\bSendable\\b",
+        "\\basync\\b",
+        "\\bawait\\b"
+      ],
+      "swiftExample": "actor Counter { var value = 0; func increment() { value += 1 } }",
+      "javaExample": "private volatile boolean running = true;           // visibility only\nprivate final AtomicInteger count = new AtomicInteger();\ncount.incrementAndGet();                           // atomic\npublic synchronized void transfer(...) { ... }      // critical section",
+      "gotchas": [
+        "count++ on a volatile field is still a race.",
+        "async/await has no direct Java syntax; use CompletableFuture or (Java 21) virtual threads with plain blocking code."
+      ],
+      "related": [],
+      "tags": [
+        "concurrency",
+        "threads"
+      ],
+      "since": null
+    },
+    {
+      "id": "field-defaults",
+      "category": "objects",
+      "title": "Fields get default values (null!)",
+      "swift": "Stored properties must be initialized",
+      "java": "Fields default to 0, 0.0, false, '\\u0000', null",
+      "summary": "Java fields are silently default-initialized; local variables are not and must be assigned before use.",
+      "risk": "medium",
+      "detect": [],
+      "swiftExample": "class Example { var name: String }   // compile error without init",
+      "javaExample": "class Example {\n    int count;      // 0\n    String name;    // null\n}",
+      "gotchas": [
+        "Make fields final to force initialization in every constructor."
+      ],
+      "related": [
+        "class-declaration",
+        "optional-type"
+      ],
+      "tags": [
+        "classes",
+        "null-safety"
+      ],
+      "since": null
+    },
+    {
+      "id": "init-chaining",
+      "category": "objects",
+      "title": "convenience init → this(…)",
+      "swift": "convenience init(name:) { self.init(name: name, age: 0) }",
+      "java": "Person(String name) { this(name, 0); }",
+      "summary": "Constructor chaining uses this(…) or super(…), which must be the first statement.",
+      "risk": "low",
+      "detect": [
+        "\\bconvenience\\s+init\\b",
+        "\\bself\\.init\\s*\\("
+      ],
+      "swiftExample": "init(name: String, age: Int) { … }\nconvenience init(name: String) { self.init(name: name, age: 0) }",
+      "javaExample": "Person(String name, int age) { this.name = name; this.age = age; }\nPerson(String name) { this(name, 0); }",
+      "gotchas": [
+        "Initialization order: static initializers (once) → super(...) → field initializers/instance blocks in source order → rest of constructor."
+      ],
+      "related": [
+        "default-parameters",
+        "class-declaration"
+      ],
+      "tags": [
+        "classes",
+        "constructors"
+      ],
+      "since": null
+    },
+    {
+      "id": "default-parameters",
+      "category": "objects",
+      "title": "Default parameter values → overloads or builder",
+      "swift": "init(host: String, port: Int = 80)",
+      "java": "overloaded constructors / builder",
+      "summary": "Java has no default parameter values. Use overloads that delegate, or a builder / parameter record for many options.",
+      "risk": "medium",
+      "detect": [
+        "\\b(func\\s+\\w+|init)\\s*(<[^>]*>)?\\s*\\([^)]*:\\s*[^,)=]+=\\s*[^=]"
+      ],
+      "swiftExample": "init(host: String, port: Int = 80, secure: Bool = false)",
+      "javaExample": "Server(String host) { this(host, 80, false); }\nServer(String host, int port) { this(host, port, false); }\nServer(String host, int port, boolean secure) { ... }\n\nServer s = Server.builder().host(\"x\").port(8080).secure(true).build();",
+      "gotchas": [],
+      "related": [
+        "init-chaining",
+        "argument-labels"
+      ],
+      "tags": [
+        "functions",
+        "constructors",
+        "api-design"
+      ],
+      "since": null
+    },
+    {
+      "id": "failable-init",
+      "category": "objects",
+      "title": "init? → static factory returning Optional",
+      "swift": "init?(raw: String)",
+      "java": "static Optional<Email> parse(String raw)",
+      "summary": "Constructors can't return null. Use a static factory returning Optional, or throw IllegalArgumentException.",
+      "risk": "medium",
+      "detect": [
+        "\\binit\\s*\\?"
+      ],
+      "swiftExample": "init?(raw: String) { guard raw.contains(\"@\") else { return nil } … }",
+      "javaExample": "public static Optional<Email> parse(String raw) {\n    return raw.contains(\"@\") ? Optional.of(new Email(raw)) : Optional.empty();\n}",
+      "gotchas": [],
+      "related": [
+        "optional-return"
+      ],
+      "tags": [
+        "constructors",
+        "optionals"
+      ],
+      "since": null
+    },
+    {
+      "id": "lazy-var",
+      "category": "objects",
+      "title": "lazy var → manual lazy initialization",
+      "swift": "lazy var thing = ExpensiveThing()",
+      "java": "null-check in a getter",
+      "summary": "Implement laziness in the getter. The simple version isn't thread-safe; for a lazy static singleton use the holder-class idiom.",
+      "risk": "low",
+      "detect": [
+        "\\blazy\\s+var\\b"
+      ],
+      "swiftExample": "lazy var thing = ExpensiveThing()",
+      "javaExample": "private ExpensiveThing thing;\nExpensiveThing getThing() {\n    if (thing == null) thing = new ExpensiveThing();\n    return thing;\n}",
+      "gotchas": [],
+      "related": [
+        "properties"
+      ],
+      "tags": [
+        "classes",
+        "initialization"
+      ],
+      "since": null
+    },
+    {
+      "id": "access-modifiers",
+      "category": "oop",
+      "title": "Access control → public / protected / package-private / private",
+      "swift": "open, public, internal, fileprivate, private",
+      "java": "public, public final, (package-private), private, protected",
+      "summary": "Swift internal ≈ Java package-private (no keyword). fileprivate has no equivalent. Java adds protected (package + subclasses).",
+      "risk": "medium",
+      "detect": [
+        "\\b(open|fileprivate|internal)\\s+(class|func|var|let|struct|enum|protocol|init)\\b"
+      ],
+      "swiftExample": "open class Base { }\ninternal func helper() { }\nfileprivate var cache = [String: Int]()",
+      "javaExample": "public class Base { }          // open by default\nvoid helper() { }              // package-private\nprivate Map<String, Integer> cache = new HashMap<>();",
+      "gotchas": [
+        "Swift public (not open) → public + final."
+      ],
+      "related": [
+        "open-by-default"
+      ],
+      "tags": [
+        "access-control"
+      ],
+      "since": null
+    },
+    {
+      "id": "variable-shadowing",
+      "category": "oop",
+      "title": "Shadowing locals → compile error in Java",
+      "swift": "if let x = x / nested let x",
+      "java": "reuse the variable or pick a new name",
+      "summary": "Java forbids redeclaring a local variable in a nested block (a local may still shadow a field).",
+      "risk": "medium",
+      "detect": [
+        "\\b(if|guard)\\s+let\\s+(\\w+)\\s*=\\s*\\2\\b",
+        "\\b(if|guard)\\s+let\\s+\\w+\\s*(\\{|else\\b|,)"
+      ],
+      "swiftExample": "if let user = user { … }",
+      "javaExample": "if (user != null) { … }      // just use user\nint x = 1; if (true) { int x = 2; }   // compile error",
+      "gotchas": [],
+      "related": [
+        "optional-binding"
+      ],
+      "tags": [
+        "scope"
+      ],
+      "since": null
+    },
+    {
+      "id": "inheritance",
+      "category": "oop",
+      "title": "class Dog: Animal → extends + @Override",
+      "swift": "class Dog: Animal { override func speak() }",
+      "java": "class Dog extends Animal { @Override public String speak() }",
+      "summary": "Use extends, call the parent constructor with super(...), and always annotate overrides with @Override.",
+      "risk": "low",
+      "detect": [
+        "\\boverride\\s+(func|var|init)\\b",
+        "\\bsuper\\.init\\s*\\("
+      ],
+      "swiftExample": "class Dog: Animal {\n    override func speak() -> String { \"Woof \" + super.speak() }\n}",
+      "javaExample": "public class Dog extends Animal {\n    public Dog(String name) { super(name); }\n    @Override\n    public String speak() { return \"Woof \" + super.speak(); }\n}",
+      "gotchas": [
+        "Every class extends Object (equals, hashCode, toString)."
+      ],
+      "related": [
+        "equatable-hashable",
+        "abstract-classes"
+      ],
+      "tags": [
+        "inheritance"
+      ],
+      "since": null
+    },
+    {
+      "id": "equatable-hashable",
+      "category": "oop",
+      "title": "Equatable / Hashable → equals() + hashCode()",
+      "swift": "struct User: Hashable",
+      "java": "override equals and hashCode (or use a record)",
+      "summary": "Map keys, sets, contains and indexOf use equals/hashCode. Records generate both; for classes implement them together.",
+      "risk": "high",
+      "detect": [
+        ":[^{\\n]*\\b(Equatable|Hashable|Comparable)\\b"
+      ],
+      "swiftExample": "struct User: Hashable { let id: String }",
+      "javaExample": "record User(String id) {}   // equals + hashCode generated\n\n@Override public boolean equals(Object o) {\n    return o instanceof User u && id.equals(u.id);\n}\n@Override public int hashCode() { return Objects.hash(id); }",
+      "gotchas": [
+        "Overriding equals without hashCode silently breaks HashMap/HashSet.",
+        "Comparable → implements Comparable<T> with compareTo returning int."
+      ],
+      "related": [
+        "equality-operator",
+        "struct-to-record",
+        "collection-types"
+      ],
+      "tags": [
+        "equality",
+        "hashing"
+      ],
+      "since": null
+    },
+    {
+      "id": "protocols",
+      "category": "oop",
+      "title": "protocol → interface (default methods)",
+      "swift": "protocol Drawable { func draw() } + extension",
+      "java": "interface Drawable { void draw(); default … }",
+      "summary": "Protocols become interfaces; protocol-extension implementations become default methods. A class can implement many interfaces.",
+      "risk": "low",
+      "detect": [
+        "\\bprotocol\\s+\\w+"
+      ],
+      "swiftExample": "protocol Drawable { func draw() }\nextension Drawable { func describe() -> String { \"drawable\" } }",
+      "javaExample": "public interface Drawable {\n    void draw();\n    default String describe() { return \"drawable\"; }\n}\npublic class Box implements Drawable {\n    @Override public void draw() { }\n}",
+      "gotchas": [
+        "No retroactive conformance: you can't make an existing class implement your interface."
+      ],
+      "related": [
+        "extensions",
+        "associated-types",
+        "abstract-classes"
+      ],
+      "tags": [
+        "interfaces"
+      ],
+      "since": null
+    },
+    {
+      "id": "extensions",
+      "category": "oop",
+      "title": "extension → static utility class (no extension methods)",
+      "swift": "extension String { func isPalindrome() -> Bool }",
+      "java": "StringUtils.isPalindrome(s)",
+      "summary": "You can't add methods to existing classes. Use a final utility class with a private constructor, or default methods on your own interfaces.",
+      "risk": "medium",
+      "detect": [
+        "^[ \\t]*(\\w+[ \\t]+)*extension[ \\t]+\\w+"
+      ],
+      "swiftExample": "extension String {\n    var isPalindrome: Bool { self == String(reversed()) }\n}",
+      "javaExample": "public final class StringUtils {\n    private StringUtils() {}\n    public static boolean isPalindrome(String s) { ... }\n}\nStringUtils.isPalindrome(\"level\");",
+      "gotchas": [
+        "Extensions used for protocol conformance → put implements on the class itself."
+      ],
+      "related": [
+        "protocols",
+        "free-functions"
+      ],
+      "tags": [
+        "extensions"
+      ],
+      "since": null
+    },
+    {
+      "id": "associated-types",
+      "category": "oop",
+      "title": "associatedtype → interface type parameter",
+      "swift": "protocol Container { associatedtype Item }",
+      "java": "interface Container<T> { T get(); }",
+      "summary": "Associated types become generic type parameters on the interface.",
+      "risk": "low",
+      "detect": [
+        "\\bassociatedtype\\b"
+      ],
+      "swiftExample": "protocol Container { associatedtype Item; func get() -> Item }",
+      "javaExample": "interface Container<T> { T get(); }",
+      "gotchas": [],
+      "related": [
+        "protocols",
+        "generic-methods"
+      ],
+      "tags": [
+        "generics",
+        "interfaces"
+      ],
+      "since": null
+    },
+    {
+      "id": "abstract-classes",
+      "category": "oop",
+      "title": "fatalError() stubs → abstract class",
+      "swift": "func area() -> Double { fatalError(\"subclass must override\") }",
+      "java": "public abstract double area();",
+      "summary": "Java has abstract classes. Use them for shared state/constructor logic; use interfaces for pure contracts.",
+      "risk": "low",
+      "detect": [
+        "fatalError\\s*\\("
+      ],
+      "swiftExample": "class Shape { func area() -> Double { fatalError(\"override\") } }",
+      "javaExample": "public abstract class Shape {\n    public abstract double area();\n    public String describe() { return \"area \" + area(); }\n}",
+      "gotchas": [
+        "fatalError elsewhere → throw new IllegalStateException(...) or UnsupportedOperationException."
+      ],
+      "related": [
+        "protocols",
+        "inheritance"
+      ],
+      "tags": [
+        "inheritance",
+        "abstraction"
+      ],
+      "since": null
+    },
+    {
+      "id": "sealed-hierarchies",
+      "category": "oop",
+      "title": "Closed set of types → sealed interface",
+      "swift": "enum Result { case success(String), failure(String) }",
+      "java": "sealed interface Result permits Success, Failure {}",
+      "summary": "sealed restricts implementors, which enables exhaustive switch.",
+      "risk": "low",
+      "detect": [
+        "\\bResult\\s*<"
+      ],
+      "swiftExample": "let r: Result<String, Error>",
+      "javaExample": "public sealed interface Result permits Success, Failure {}\npublic record Success(String data) implements Result {}\npublic record Failure(String error) implements Result {}",
+      "gotchas": [
+        "Swift's Result<T, E> is often just a return value + exception in Java."
+      ],
+      "related": [
+        "enum-associated-values",
+        "switch-patterns"
+      ],
+      "tags": [
+        "sealed",
+        "records"
+      ],
+      "since": "Java 17"
+    },
+    {
+      "id": "type-erasure",
+      "category": "oop",
+      "title": "Generics are erased at runtime",
+      "swift": "T.self, T(), x is [String]",
+      "java": "pass Class<T> or Supplier<T>",
+      "summary": "Java generics are erased: new T(), T.class and instanceof List<String> aren't possible.",
+      "risk": "medium",
+      "detect": [
+        "\\b[A-Z]\\.self\\b",
+        "\\b[A-Z]\\.Type\\b",
+        "\\bis\\s+\\[\\w+\\]"
+      ],
+      "swiftExample": "func make<T: Decodable>(_ type: T.Type) -> T",
+      "javaExample": "<T> T make(Class<T> type) { ... }\n<T> T make(Supplier<T> factory) { return factory.get(); }",
+      "gotchas": [],
+      "related": [
+        "generic-methods"
+      ],
+      "tags": [
+        "generics"
+      ],
+      "since": null
+    },
+    {
+      "id": "throws-checked-unchecked",
+      "category": "exceptions",
+      "title": "throws → checked or unchecked (decide!)",
+      "swift": "func validate() throws",
+      "java": "void validate() throws ValidationException / RuntimeException",
+      "summary": "Checked exceptions (extend Exception) must be declared or caught; unchecked (extend RuntimeException) need not be. Choose deliberately.",
+      "risk": "high",
+      "detect": [
+        "\\bthrows\\b",
+        "\\bthrow\\s+\\w"
+      ],
+      "swiftExample": "func validate(_ s: String) throws {\n    if s.count < 3 { throw ValidationError.tooShort }\n}",
+      "javaExample": "public void validate(String s) throws ValidationException {\n    if (s.length() < 3) {\n        throw new ValidationException(\"Too short: \" + s);\n    }\n}",
+      "gotchas": [
+        "Checked: recoverable conditions (I/O, parsing input). Unchecked: programming errors.",
+        "Never catch Error (OutOfMemoryError etc.).",
+        "Built-ins: IllegalArgumentException, IllegalStateException, UnsupportedOperationException, IndexOutOfBoundsException."
+      ],
+      "related": [
+        "error-types",
+        "do-catch",
+        "throwing-closures"
+      ],
+      "tags": [
+        "exceptions"
+      ],
+      "since": null
+    },
+    {
+      "id": "error-types",
+      "category": "exceptions",
+      "title": "enum …: Error → exception class",
+      "swift": "enum ValidationError: Error { case tooShort }",
+      "java": "class ValidationException extends Exception",
+      "summary": "Errors are classes extending Exception or RuntimeException; enum cases become subclasses or a message/field.",
+      "risk": "medium",
+      "detect": [
+        "\\b(enum|struct|class)[ \\t]+\\w+[ \\t]*:[^{\\n]*\\bError\\b"
+      ],
+      "swiftExample": "enum ValidationError: Error { case tooShort }",
+      "javaExample": "public class ValidationException extends Exception {\n    public ValidationException(String message) { super(message); }\n}",
+      "gotchas": [
+        "Wrap with a cause to keep the chain: throw new RepositoryException(\"msg\", e);"
+      ],
+      "related": [
+        "throws-checked-unchecked"
+      ],
+      "tags": [
+        "exceptions"
+      ],
+      "since": null
+    },
+    {
+      "id": "do-catch",
+      "category": "exceptions",
+      "title": "do { try } catch → try { } catch (Type e)",
+      "swift": "do { try f() } catch { }",
+      "java": "try { f(); } catch (SomeException e) { }",
+      "summary": "No try keyword per call. Catch the most specific types first; multi-catch with |; finally always runs.",
+      "risk": "low",
+      "detect": [
+        "\\bdo\\s*\\{",
+        "\\bcatch\\b"
+      ],
+      "swiftExample": "do {\n    try validate(input)\n} catch ValidationError.tooShort {\n    print(\"short\")\n} catch {\n    print(error)\n}",
+      "javaExample": "try {\n    validate(input);\n} catch (ValidationException e) {\n    System.out.println(e.getMessage());\n} catch (IOException | ParseException e) {\n    log(e);\n} finally {\n    cleanup();\n}",
+      "gotchas": [
+        "Catching Exception broadly is usually a smell."
+      ],
+      "related": [
+        "throws-checked-unchecked",
+        "try-optional"
+      ],
+      "tags": [
+        "exceptions"
+      ],
+      "since": null
+    },
+    {
+      "id": "try-optional",
+      "category": "exceptions",
+      "title": "try? → catch and return Optional.empty()",
+      "swift": "let x = try? f()",
+      "java": "try { … } catch (E e) { Optional.empty() }",
+      "summary": "There's no try?; catch the exception and fall back to null or Optional.empty().",
+      "risk": "medium",
+      "detect": [
+        "\\btry\\?"
+      ],
+      "swiftExample": "let parsed = try? parse(text)",
+      "javaExample": "Optional<Integer> parsed;\ntry {\n    parsed = Optional.of(Integer.parseInt(text));\n} catch (NumberFormatException e) {\n    parsed = Optional.empty();\n}",
+      "gotchas": [],
+      "related": [
+        "try-force",
+        "string-parse-number"
+      ],
+      "tags": [
+        "exceptions",
+        "optionals"
+      ],
+      "since": null
+    },
+    {
+      "id": "try-force",
+      "category": "exceptions",
+      "title": "try! → wrap as unchecked exception",
+      "swift": "let s = try! load()",
+      "java": "catch (IOException e) { throw new UncheckedIOException(e); }",
+      "summary": "try! becomes catching the checked exception and rethrowing it unchecked.",
+      "risk": "medium",
+      "detect": [
+        "\\btry!"
+      ],
+      "swiftExample": "let text = try! String(contentsOf: url)",
+      "javaExample": "try {\n    return Files.readString(path);\n} catch (IOException e) {\n    throw new UncheckedIOException(e);\n}",
+      "gotchas": [],
+      "related": [
+        "try-optional"
+      ],
+      "tags": [
+        "exceptions"
+      ],
+      "since": null
+    },
+    {
+      "id": "try-with-resources",
+      "category": "exceptions",
+      "title": "Resource cleanup → try-with-resources",
+      "swift": "defer { reader.close() }",
+      "java": "try (var reader = …) { }",
+      "summary": "Resources declared in try ( … ) are closed automatically in reverse order, even on exceptions.",
+      "risk": "medium",
+      "detect": [
+        "\\.close\\s*\\(\\s*\\)"
+      ],
+      "swiftExample": "let reader = try FileHandle(forReadingFrom: url)\ndefer { try? reader.close() }",
+      "javaExample": "try (var reader = Files.newBufferedReader(path);\n     var writer = Files.newBufferedWriter(out)) {\n    writer.write(reader.readLine());\n}",
+      "gotchas": [],
+      "related": [
+        "defer",
+        "deinit-autocloseable"
+      ],
+      "tags": [
+        "exceptions",
+        "resources"
+      ],
+      "since": null
+    },
+    {
+      "id": "throwing-closures",
+      "category": "exceptions",
+      "title": "Throwing closures → standard interfaces can't throw checked exceptions",
+      "swift": "(T) throws -> R / rethrows",
+      "java": "wrap inside the lambda, or a custom @FunctionalInterface",
+      "summary": "Function, Consumer etc. can't throw checked exceptions. Catch and wrap inside the lambda, or declare your own interface.",
+      "risk": "high",
+      "detect": [
+        "\\)\\s*throws\\s*->",
+        "\\brethrows\\b",
+        "\\{[^{}\\n]*\\btry\\b(?![?!])"
+      ],
+      "swiftExample": "try paths.forEach { try process($0) }",
+      "javaExample": "paths.forEach(p -> {\n    try {\n        process(p);\n    } catch (IOException e) {\n        throw new UncheckedIOException(e);\n    }\n});\n\n@FunctionalInterface\ninterface IOAction { void run() throws IOException; }",
+      "gotchas": [],
+      "related": [
+        "function-types",
+        "throws-checked-unchecked"
+      ],
+      "tags": [
+        "exceptions",
+        "lambdas"
+      ],
+      "since": null
+    },
+    {
+      "id": "collection-types",
+      "category": "collections",
+      "title": "Array / Dictionary / Set → List / Map / Set (references!)",
+      "swift": "[T], [K: V], Set<T>",
+      "java": "List<T> / Map<K,V> / Set<T> (ArrayList, HashMap, HashSet)",
+      "summary": "Swift collections are value types that copy on assignment. Java collections are references: assigning shares the same object.",
+      "risk": "high",
+      "detect": [
+        "\\[\\s*[A-Z]\\w*\\s*\\]",
+        "\\[\\s*[A-Z]\\w*\\s*:\\s*[A-Z]\\w*\\s*\\]",
+        "\\b(Array|Dictionary|Set)\\s*<",
+        "^[ \\t]*(let|var)[ \\t]+\\w+[ \\t]*=[ \\t]*\\["
+      ],
+      "swiftExample": "var a = [\"x\"]\nvar b = a\nb.append(\"y\")   // a is still [\"x\"]",
+      "javaExample": "List<String> a = new ArrayList<>(List.of(\"x\"));\nList<String> b = a;\nb.add(\"y\");                                // a also has \"y\"!\nList<String> copy = new ArrayList<>(a);   // explicit copy",
+      "gotchas": [
+        "Declare with the interface type: List<String> names = new ArrayList<>();",
+        "Map ordering: HashMap (none), LinkedHashMap (insertion), TreeMap (sorted).",
+        "Deque/stack/queue → ArrayDeque.",
+        "Generics take reference types only: List<Integer>, never List<int>."
+      ],
+      "related": [
+        "immutable-collections",
+        "array-operations",
+        "dictionary-operations",
+        "boxed-types"
+      ],
+      "tags": [
+        "collections",
+        "value-semantics"
+      ],
+      "since": null
+    },
+    {
+      "id": "arrays",
+      "category": "collections",
+      "title": "Fixed-size arrays (rare)",
+      "swift": "Array(repeating: 0, count: 5)",
+      "java": "new int[5]",
+      "summary": "Java arrays are fixed-size; .length is a field. Prefer List in most code.",
+      "risk": "low",
+      "detect": [
+        "Array\\s*\\(\\s*repeating:"
+      ],
+      "swiftExample": "var nums = Array(repeating: 0, count: 5)",
+      "javaExample": "int[] nums = new int[5];           // [0, 0, 0, 0, 0]\nint[] primes = {2, 3, 5, 7};\nnums.length;                       // field, not a method\nArrays.toString(primes);\nArrays.equals(a, b);               // a.equals(b) compares references!",
+      "gotchas": [
+        "String[] names = new String[3] is [null, null, null]."
+      ],
+      "related": [
+        "collection-types"
+      ],
+      "tags": [
+        "collections",
+        "arrays"
+      ],
+      "since": null
+    },
+    {
+      "id": "immutable-collections",
+      "category": "collections",
+      "title": "let array → List.of (fails at runtime)",
+      "swift": "let fixed = [\"a\", \"b\"]",
+      "java": "List.of(\"a\", \"b\")",
+      "summary": "List.of / Map.of / Set.of create unmodifiable collections, but modification fails at runtime (UnsupportedOperationException), not compile time.",
+      "risk": "medium",
+      "detect": [
+        "\\blet\\s+\\w+\\s*(:\\s*\\[[^\\]]+\\])?\\s*=\\s*\\["
+      ],
+      "swiftExample": "let fixed = [\"a\", \"b\"]",
+      "javaExample": "List<String> fixed = List.of(\"a\", \"b\");\nfixed.add(\"c\");   // UnsupportedOperationException at runtime\nList<String> mutable = new ArrayList<>(List.of(\"a\", \"b\"));",
+      "gotchas": [
+        "List.of/Map.of/Set.of reject null elements.",
+        "stream.toList() also returns an unmodifiable list."
+      ],
+      "related": [
+        "collection-types"
+      ],
+      "tags": [
+        "collections",
+        "immutability"
+      ],
+      "since": null
+    },
+    {
+      "id": "array-operations",
+      "category": "collections",
+      "title": "Array methods → List methods",
+      "swift": "append, insert(at:), remove(at:), first, firstIndex(of:)",
+      "java": "add, add(i, x), remove(i), getFirst(), indexOf",
+      "summary": "Most array operations map directly, with a few traps: getFirst throws on empty, indexOf returns -1.",
+      "risk": "medium",
+      "detect": [
+        "\\.(append|insert|firstIndex|lastIndex)\\s*\\(",
+        "\\.remove\\s*\\(\\s*at:",
+        "\\.(first|last)\\b(?!\\s*\\()"
+      ],
+      "swiftExample": "arr.append(x); arr.insert(x, at: 0); let i = arr.firstIndex(of: x); let f = arr.first",
+      "javaExample": "list.add(x); list.add(0, x); int i = list.indexOf(x); var f = list.getFirst();",
+      "gotchas": [
+        "count → size(); arr[0] → get(0); arr[0] = x → set(0, x)",
+        "first/last → getFirst()/getLast() (Java 21) THROW if empty instead of returning nil",
+        "firstIndex(of:) → indexOf returns -1, not nil",
+        "List<Integer>.remove(Integer) removes by value; remove(int) by index",
+        "sort() → list.sort(Comparator.naturalOrder()); reversed() → list.reversed() (a view, Java 21)",
+        "removeAll(where:) → removeIf(...); removing inside for-each throws ConcurrentModificationException"
+      ],
+      "related": [
+        "collection-types",
+        "dictionary-operations"
+      ],
+      "tags": [
+        "collections",
+        "lists"
+      ],
+      "since": "Java 21"
+    },
+    {
+      "id": "dictionary-operations",
+      "category": "collections",
+      "title": "Dictionary subscripts → Map methods",
+      "swift": "dict[key], dict[key, default: 0] += 1, dict[key] = nil",
+      "java": "map.get (null), merge, remove",
+      "summary": "map.get returns null when missing. Use getOrDefault, merge and remove for the common Swift subscript idioms.",
+      "risk": "medium",
+      "detect": [
+        "\\[\\s*[^\\]]+,\\s*default:",
+        "\\w\\[[^\\]]+\\]\\s*=\\s*nil\\b"
+      ],
+      "swiftExample": "counts[word, default: 0] += 1\ndict[key] = nil",
+      "javaExample": "counts.merge(word, 1, Integer::sum);\nint n = counts.getOrDefault(word, 0);\nmap.remove(key);",
+      "gotchas": [
+        "dict.keys / values → map.keySet() / map.values()",
+        "dict[key] = v → map.put(key, v)"
+      ],
+      "related": [
+        "collection-types",
+        "dictionary-loops"
+      ],
+      "tags": [
+        "collections",
+        "maps"
+      ],
+      "since": null
+    },
+    {
+      "id": "set-operations",
+      "category": "collections",
+      "title": "union / intersection → addAll / retainAll (mutating)",
+      "swift": "a.union(b), a.intersection(b)",
+      "java": "copy then addAll / retainAll",
+      "summary": "Java's set algebra methods mutate the receiver, so copy first.",
+      "risk": "medium",
+      "detect": [
+        "\\.(union|intersection|subtracting|symmetricDifference|formUnion)\\s*\\("
+      ],
+      "swiftExample": "let u = a.union(b)",
+      "javaExample": "var u = new HashSet<>(a); u.addAll(b);\nvar i = new HashSet<>(a); i.retainAll(b);\nvar d = new HashSet<>(a); d.removeAll(b);",
+      "gotchas": [],
+      "related": [
+        "collection-types"
+      ],
+      "tags": [
+        "collections",
+        "sets"
+      ],
+      "since": null
+    },
+    {
+      "id": "stream-basics",
+      "category": "streams",
+      "title": "map/filter chains → stream() … toList()",
+      "swift": "people.filter { … }.map { … }.sorted()",
+      "java": "people.stream().filter(…).map(…).sorted().toList()",
+      "summary": "Streams are explicit: enter with .stream(), exit with a terminal operation. They're lazy, single-use, and don't modify the source.",
+      "risk": "low",
+      "detect": [
+        "\\.(map|filter|flatMap|forEach)\\s*[\\({]"
+      ],
+      "swiftExample": "let result = people\n    .filter { $0.age >= 18 }\n    .map { $0.name }\n    .sorted()",
+      "javaExample": "List<String> result = people.stream()\n        .filter(p -> p.age() >= 18)\n        .map(Person::name)\n        .sorted()\n        .toList();",
+      "gotchas": [
+        "Don't mutate outside state from map/filter.",
+        "A plain loop is often clearer for complex logic with early exits.",
+        "parallelStream() is rarely a win; measure first."
+      ],
+      "related": [
+        "compact-map",
+        "stream-reduce",
+        "stream-sorting",
+        "stream-search",
+        "stream-collectors"
+      ],
+      "tags": [
+        "streams"
+      ],
+      "since": null
+    },
+    {
+      "id": "compact-map",
+      "category": "streams",
+      "title": "compactMap → filter(nonNull) / Optional::stream",
+      "swift": ".compactMap { Int($0) }",
+      "java": ".map(...).filter(Objects::nonNull)",
+      "summary": "compactMap becomes map + filter(Objects::nonNull), or flatMap over Optional results.",
+      "risk": "low",
+      "detect": [
+        "\\.compactMap\\b"
+      ],
+      "swiftExample": "let ids = strings.compactMap { Int($0) }",
+      "javaExample": "List<User> users = ids.stream()\n        .map(repo::findOrNull)\n        .filter(Objects::nonNull)\n        .toList();\n// Optional-returning: .flatMap(id -> repo.find(id).stream())",
+      "gotchas": [],
+      "related": [
+        "stream-basics"
+      ],
+      "tags": [
+        "streams",
+        "optionals"
+      ],
+      "since": null
+    },
+    {
+      "id": "stream-reduce",
+      "category": "streams",
+      "title": "reduce → reduce / mapToInt().sum()",
+      "swift": ".reduce(0, +)",
+      "java": ".mapToInt(...).sum() / .reduce(0, Integer::sum)",
+      "summary": "Use primitive streams (mapToInt/mapToDouble) for sums and averages; they avoid boxing.",
+      "risk": "low",
+      "detect": [
+        "\\.reduce\\s*\\("
+      ],
+      "swiftExample": "let total = orders.reduce(0) { $0 + $1.quantity }",
+      "javaExample": "int total = orders.stream().mapToInt(Order::quantity).sum();\ndouble avg = scores.stream().mapToDouble(Double::doubleValue).average().orElse(0);",
+      "gotchas": [
+        "count() returns long."
+      ],
+      "related": [
+        "stream-basics"
+      ],
+      "tags": [
+        "streams"
+      ],
+      "since": null
+    },
+    {
+      "id": "stream-sorting",
+      "category": "streams",
+      "title": "sorted { } / sorted(by:) → Comparator",
+      "swift": "people.sorted { $0.age < $1.age }",
+      "java": "sorted(Comparator.comparing(Person::age))",
+      "summary": "Build comparators with Comparator.comparing and thenComparing instead of a less-than closure.",
+      "risk": "low",
+      "detect": [
+        "\\.(sorted|sort)\\s*(\\{|\\(\\s*by:)",
+        "\\.(min|max)\\s*(\\{|\\(\\s*by:)"
+      ],
+      "swiftExample": "let sorted = people.sorted { $0.age < $1.age }\nlet desc = nums.sorted(by: >)",
+      "javaExample": "people.sort(Comparator.comparing(Person::lastName)\n        .thenComparing(Person::firstName)\n        .thenComparing(Person::age, Comparator.reverseOrder()));\nnums.stream().sorted(Comparator.reverseOrder()).toList();",
+      "gotchas": [
+        "min()/max() take a comparator and return Optional."
+      ],
+      "related": [
+        "stream-basics"
+      ],
+      "tags": [
+        "streams",
+        "sorting"
+      ],
+      "since": null
+    },
+    {
+      "id": "stream-search",
+      "category": "streams",
+      "title": "first(where:) / contains(where:) / allSatisfy → findFirst / anyMatch / allMatch",
+      "swift": "items.first(where: { … })",
+      "java": "items.stream().filter(…).findFirst()",
+      "summary": "Searching predicates map to findFirst (returns Optional), anyMatch, allMatch, noneMatch.",
+      "risk": "low",
+      "detect": [
+        "\\.first\\s*\\(\\s*where:",
+        "\\.contains\\s*\\(\\s*where:",
+        "\\.allSatisfy\\b",
+        "\\.(prefix|dropFirst|dropLast)\\s*\\("
+      ],
+      "swiftExample": "let admin = users.first(where: { $0.isAdmin })",
+      "javaExample": "Optional<User> admin = users.stream().filter(User::isAdmin).findFirst();\nboolean any = users.stream().anyMatch(User::isAdmin);",
+      "gotchas": [
+        "prefix(n) → limit(n); dropFirst(n) → skip(n)"
+      ],
+      "related": [
+        "stream-basics",
+        "optional-return"
+      ],
+      "tags": [
+        "streams"
+      ],
+      "since": null
+    },
+    {
+      "id": "stream-collectors",
+      "category": "streams",
+      "title": "Dictionary(grouping:) / joined → Collectors",
+      "swift": "Dictionary(grouping: people, by: { $0.city })",
+      "java": "collect(groupingBy(Person::city))",
+      "summary": "Collectors build maps, sets and strings from streams.",
+      "risk": "low",
+      "detect": [
+        "Dictionary\\s*\\(\\s*grouping:",
+        "Dictionary\\s*\\(\\s*uniqueKeysWithValues:"
+      ],
+      "swiftExample": "let byCity = Dictionary(grouping: people, by: { $0.city })",
+      "javaExample": "import static java.util.stream.Collectors.*;\nMap<String, List<Person>> byCity = people.stream().collect(groupingBy(Person::city));\nMap<String, Long> counts = people.stream().collect(groupingBy(Person::city, counting()));\nMap<String, Integer> nameToAge = people.stream().collect(toMap(Person::name, Person::age));\nString csv = names.stream().collect(joining(\", \"));",
+      "gotchas": [
+        "toMap throws on duplicate keys unless you pass a merge function.",
+        "partitioningBy(pred) splits into Map<Boolean, List<T>>."
+      ],
+      "related": [
+        "stream-basics",
+        "string-building"
+      ],
+      "tags": [
+        "streams",
+        "collectors"
+      ],
+      "since": null
+    },
+    {
+      "id": "zip",
+      "category": "streams",
+      "title": "zip → no built-in; use an index range",
+      "swift": "zip(a, b)",
+      "java": "IntStream.range(0, n).mapToObj(i -> …)",
+      "summary": "Java streams have no zip. Iterate indices.",
+      "risk": "low",
+      "detect": [
+        "\\bzip\\s*\\("
+      ],
+      "swiftExample": "for (x, y) in zip(xs, ys) { }",
+      "javaExample": "int n = Math.min(xs.size(), ys.size());\nfor (int i = 0; i < n; i++) { var x = xs.get(i); var y = ys.get(i); }",
+      "gotchas": [],
+      "related": [
+        "enumerated-loops"
+      ],
+      "tags": [
+        "streams"
+      ],
+      "since": null
+    },
+    {
+      "id": "free-functions",
+      "category": "functions",
+      "title": "Top-level functions → static methods",
+      "swift": "func greet(name: String) -> String",
+      "java": "public static String greet(String name)",
+      "summary": "There are no free functions; put them as static methods on a final utility class. import static lets you call them unqualified.",
+      "risk": "low",
+      "detect": [
+        "^func\\s+\\w+"
+      ],
+      "swiftExample": "func greet(name: String) -> String { \"Hello, \\(name)\" }",
+      "javaExample": "public final class Greetings {\n    private Greetings() {}\n    public static String greet(String name) { return \"Hello, \" + name; }\n}\n// import static com.example.Greetings.greet;",
+      "gotchas": [],
+      "related": [
+        "static-members",
+        "extensions"
+      ],
+      "tags": [
+        "functions"
+      ],
+      "since": null
+    },
+    {
+      "id": "argument-labels",
+      "category": "functions",
+      "title": "Argument labels → no labels (descriptive method names)",
+      "swift": "move(from: a, to: b)",
+      "java": "move(a, b) / moveTo(…)",
+      "summary": "Java has no argument labels. Put the meaning in the method name, or use a parameter record/builder.",
+      "risk": "low",
+      "detect": [
+        "\\bfunc\\s+\\w+\\s*(<[^>]*>)?\\s*\\(\\s*[a-z]\\w*\\s+\\w+\\s*:"
+      ],
+      "swiftExample": "func move(from start: Point, to end: Point, animated: Bool = true)",
+      "javaExample": "void move(Point start, Point end, boolean animated) { ... }\nvoid move(Point start, Point end) { move(start, end, true); }",
+      "gotchas": [
+        "Overloading by return type alone is not allowed in Java."
+      ],
+      "related": [
+        "default-parameters"
+      ],
+      "tags": [
+        "functions",
+        "api-design"
+      ],
+      "since": null
+    },
+    {
+      "id": "varargs",
+      "category": "functions",
+      "title": "Variadic Int... → int...",
+      "swift": "func sum(_ nums: Int...)",
+      "java": "static int sum(int... nums)",
+      "summary": "Varargs work the same; inside the method the parameter is an array.",
+      "risk": "low",
+      "detect": [
+        "\\w\\.\\.\\.\\s*[,)]"
+      ],
+      "swiftExample": "func sum(_ nums: Int...) -> Int",
+      "javaExample": "static int sum(int... nums) {\n    int total = 0;\n    for (int n : nums) total += n;\n    return total;\n}",
+      "gotchas": [],
+      "related": [],
+      "tags": [
+        "functions"
+      ],
+      "since": null
+    },
+    {
+      "id": "inout",
+      "category": "functions",
+      "title": "inout → doesn't exist (return the new value)",
+      "swift": "func reset(_ list: inout [String])",
+      "java": "return a new value instead",
+      "summary": "Java passes everything by value; for objects the reference is copied. You can mutate the object but not reassign the caller's variable.",
+      "risk": "high",
+      "detect": [
+        "\\binout\\b",
+        "&\\w+\\s*[,)]"
+      ],
+      "swiftExample": "func increment(_ x: inout Int) { x += 1 }\nincrement(&count)",
+      "javaExample": "int increment(int x) { return x + 1; }\ncount = increment(count);\n\nvoid addItem(List<String> list) { list.add(\"x\"); }         // caller sees it\nvoid reset(List<String> list) { list = new ArrayList<>(); } // caller unaffected",
+      "gotchas": [],
+      "related": [
+        "collection-types"
+      ],
+      "tags": [
+        "functions",
+        "semantics"
+      ],
+      "since": null
+    },
+    {
+      "id": "generic-methods",
+      "category": "functions",
+      "title": "Generic functions → <T> methods, constraints with extends",
+      "swift": "func max<T: Comparable>(_ a: T, _ b: T) -> T",
+      "java": "static <T extends Comparable<T>> T max(T a, T b)",
+      "summary": "Type parameters go before the return type; constraints use extends (for both classes and interfaces).",
+      "risk": "low",
+      "detect": [
+        "\\bfunc\\s+\\w+\\s*<"
+      ],
+      "swiftExample": "func firstOrDefault<T>(_ items: [T], _ fallback: T) -> T",
+      "javaExample": "static <T> T firstOrDefault(List<T> items, T fallback) {\n    return items.isEmpty() ? fallback : items.getFirst();\n}\nstatic <T extends Comparable<T>> T max(T a, T b) {\n    return a.compareTo(b) >= 0 ? a : b;\n}",
+      "gotchas": [],
+      "related": [
+        "type-erasure",
+        "associated-types"
+      ],
+      "tags": [
+        "generics",
+        "functions"
+      ],
+      "since": null
+    },
+    {
+      "id": "junit-basics",
+      "category": "testing",
+      "title": "XCTest / Swift Testing → JUnit Jupiter",
+      "swift": "XCTestCase, setUp(), XCTAssert…, @Test, #expect",
+      "java": "@Test, @BeforeEach, assertEquals…",
+      "summary": "JUnit Jupiter is the standard. Any class can hold @Test methods; they don't need to be public or prefixed with test.",
+      "risk": "low",
+      "detect": [
+        "\\bXCTestCase\\b",
+        "\\bXCTAssert\\w*",
+        "@Test\\b",
+        "#expect\\b",
+        "@Suite\\b"
+      ],
+      "swiftExample": "final class CalculatorTests: XCTestCase {\n    func testAdd() { XCTAssertEqual(calc.add(2, 3), 5) }\n}",
+      "javaExample": "class CalculatorTest {\n    @BeforeEach void setUp() { calc = new Calculator(); }\n    @Test void adds() { assertEquals(5, calc.add(2, 3)); }\n}",
+      "gotchas": [
+        "setUp/tearDown → @BeforeEach/@AfterEach; class setUp → static @BeforeAll/@AfterAll",
+        "XCTAssertNil → assertNull; XCTAssertTrue → assertTrue",
+        "XCTAssertThrowsError / #expect(throws:) → assertThrows(Type.class, () -> …)",
+        "@Test(arguments:) → @ParameterizedTest + @ValueSource/@CsvSource/@MethodSource",
+        "XCTSkip / .disabled → @Disabled / assumeTrue(...)",
+        "Tests live in src/test/java mirroring the main package.",
+        "Companions: AssertJ (fluent assertions), Mockito (mocking)."
+      ],
+      "related": [
+        "junit-assert-order"
+      ],
+      "tags": [
+        "testing"
+      ],
+      "since": null
+    },
+    {
+      "id": "junit-assert-order",
+      "category": "testing",
+      "title": "assertEquals(expected, actual) — expected first",
+      "swift": "XCTAssertEqual(actual, expected)",
+      "java": "assertEquals(expected, actual)",
+      "summary": "JUnit puts the expected value first; swapping them produces misleading failure messages. Doubles need a delta.",
+      "risk": "medium",
+      "detect": [
+        "\\bXCTAssertEqual\\b",
+        "#expect\\s*\\([^)]*==",
+        "accuracy:"
+      ],
+      "swiftExample": "XCTAssertEqual(calc.add(2, 3), 5)\nXCTAssertEqual(x, 0.3, accuracy: 1e-9)",
+      "javaExample": "assertEquals(5, calc.add(2, 3));\nassertEquals(0.3, calc.add(0.1, 0.2), 1e-9);\nassertAll(() -> assertEquals(\"Ana\", p.name()), () -> assertEquals(30, p.age()));",
+      "gotchas": [],
+      "related": [
+        "junit-basics"
+      ],
+      "tags": [
+        "testing"
+      ],
+      "since": null
+    }
+  ],
+  "checklist": [
+    {
+      "id": "int-width",
+      "text": "Int → int or long? Check the value ranges.",
+      "mappingIds": [
+        "int-width",
+        "integer-overflow"
+      ]
+    },
+    {
+      "id": "null-strategy",
+      "text": "Every optional (?) has an explicit null strategy (null check, Optional return, or non-null guarantee).",
+      "mappingIds": [
+        "optional-type",
+        "optional-binding",
+        "optional-return"
+      ]
+    },
+    {
+      "id": "equals",
+      "text": "All == on strings, wrappers and objects replaced with .equals().",
+      "mappingIds": [
+        "equality-operator",
+        "boxed-types"
+      ]
+    },
+    {
+      "id": "structs",
+      "text": "Structs → records (or immutable classes), and code relying on copy-on-assign now copies explicitly.",
+      "mappingIds": [
+        "struct-to-record",
+        "collection-types"
+      ]
+    },
+    {
+      "id": "associated-enums",
+      "text": "Enums with associated values → sealed interface + records.",
+      "mappingIds": [
+        "enum-associated-values"
+      ]
+    },
+    {
+      "id": "default-params",
+      "text": "Default parameter values → overloads or a builder.",
+      "mappingIds": [
+        "default-parameters"
+      ]
+    },
+    {
+      "id": "extensions",
+      "text": "Extensions → static utility methods or interface default methods.",
+      "mappingIds": [
+        "extensions",
+        "protocols"
+      ]
+    },
+    {
+      "id": "cleanup",
+      "text": "deinit / defer → try-with-resources or finally.",
+      "mappingIds": [
+        "deinit-autocloseable",
+        "defer",
+        "try-with-resources"
+      ]
+    },
+    {
+      "id": "captures",
+      "text": "Closures that mutate captured locals → restructured, or an atomic/holder used.",
+      "mappingIds": [
+        "closure-capture-mutation"
+      ]
+    },
+    {
+      "id": "throws",
+      "text": "throws functions → checked or unchecked decision made deliberately.",
+      "mappingIds": [
+        "throws-checked-unchecked",
+        "throwing-closures"
+      ]
+    },
+    {
+      "id": "final",
+      "text": "Classes not intended for subclassing marked final.",
+      "mappingIds": [
+        "open-by-default",
+        "access-modifiers"
+      ]
+    },
+    {
+      "id": "hashing",
+      "text": "equals + hashCode implemented for anything used as a map key or in a set.",
+      "mappingIds": [
+        "equatable-hashable"
+      ]
+    },
+    {
+      "id": "tests",
+      "text": "Tests moved from XCTest/Swift Testing to JUnit, with assertEquals(expected, actual) order fixed.",
+      "mappingIds": [
+        "junit-basics",
+        "junit-assert-order"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swift → Java</title>
+<meta name="description" content="Curated Swift to Java 21 mappings with pitfalls, built for AI agents first and humans second.">
+<link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt">
+<style>
+  :root {
+    --bg: #f7f5f0; --surface: #ffffff; --ink: #1d1b18; --muted: #6b665e; --line: #e4dfd5;
+    --swift: #e0562b; --java: #2f6db5; --high: #c23b22; --medium: #b7791f; --low: #5b7f5a;
+    --code-bg: #f1ede4;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #141311; --surface: #1d1c19; --ink: #ece8df; --muted: #9a958b; --line: #2e2c28;
+            --code-bg: #262420; --swift: #f07a52; --java: #6aa0e0; --high: #e2674f; --medium: #d9a441; --low: #8db38b; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 var(--sans); }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+  header { padding: 48px 0 24px; border-bottom: 1px solid var(--line); }
+  h1 { font-size: clamp(30px, 6vw, 48px); line-height: 1.05; margin: 0 0 12px; letter-spacing: -0.02em; }
+  h1 .s { color: var(--swift); } h1 .j { color: var(--java); }
+  .lede { color: var(--muted); max-width: 640px; margin: 0; }
+  .agent-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+  .agent-links a { font: 13px var(--mono); color: var(--ink); text-decoration: none; border: 1px solid var(--line);
+                   background: var(--surface); padding: 6px 10px; border-radius: 6px; }
+  .agent-links a:hover { border-color: var(--java); }
+  section { padding: 32px 0; border-bottom: 1px solid var(--line); }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 16px; }
+  pre, code { font-family: var(--mono); font-size: 13px; }
+  pre { background: var(--code-bg); padding: 12px 14px; border-radius: 8px; overflow-x: auto; margin: 0; white-space: pre; }
+  .snippet { position: relative; }
+  .copy { position: absolute; top: 8px; right: 8px; font: 12px var(--sans); border: 1px solid var(--line);
+          background: var(--surface); color: var(--ink); border-radius: 6px; padding: 4px 8px; cursor: pointer; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  input[type=search], textarea { width: 100%; font: 15px var(--sans); color: var(--ink); background: var(--surface);
+          border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  textarea { font: 13px/1.5 var(--mono); min-height: 160px; resize: vertical; }
+  .chip { font: 13px var(--sans); border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+          padding: 5px 10px; border-radius: 999px; cursor: pointer; }
+  .chip[aria-pressed=true] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .count { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 10px; }
+  .card summary { list-style: none; cursor: pointer; padding: 14px 16px; display: grid; gap: 6px; }
+  .card summary::-webkit-details-marker { display: none; }
+  .row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .title { font-weight: 600; }
+  .risk { font: 11px var(--sans); text-transform: uppercase; letter-spacing: 0.06em; padding: 2px 7px; border-radius: 4px; color: #fff; }
+  .risk.high { background: var(--high); } .risk.medium { background: var(--medium); } .risk.low { background: var(--low); }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font: 13px var(--mono); }
+  .pair span { overflow-wrap: anywhere; }
+  .pair .sw { color: var(--swift); } .pair .jv { color: var(--java); }
+  .body { padding: 0 16px 16px; display: grid; gap: 12px; }
+  .examples { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  ul.gotchas { margin: 0; padding-left: 18px; }
+  .meta { font: 12px var(--mono); color: var(--muted); }
+  .btn { font: 14px var(--sans); background: var(--java); color: #fff; border: 0; border-radius: 8px; padding: 9px 16px; cursor: pointer; margin-top: 10px; }
+  .finding { padding: 10px 0; border-top: 1px solid var(--line); }
+  .finding:first-child { border-top: 0; }
+  footer { padding: 32px 0 48px; color: var(--muted); font-size: 14px; }
+  @media (max-width: 640px) { .pair, .examples { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1><span class="s">Swift</span> → <span class="j">Java</span></h1>
+    <p class="lede" id="lede">Curated mappings from Swift idioms to idiomatic Java 21, each with examples and the pitfalls that cause real bugs. Built for AI agents first, people second.</p>
+    <nav class="agent-links" aria-label="Machine-readable docs">
+      <a href="/llms.txt">llms.txt</a>
+      <a href="/llms-full.txt">llms-full.txt</a>
+      <a href="/openapi.json">openapi.json</a>
+      <a href="/SKILL.md">SKILL.md</a>
+      <a href="/api">/api</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section>
+    <h2>For agents</h2>
+    <p>Add this to <code>CLAUDE.md</code>, <code>AGENTS.md</code> or <code>.cursorrules</code>:</p>
+    <div class="snippet">
+      <button class="copy" data-target="prompt">Copy</button>
+      <pre id="prompt"></pre>
+    </div>
+  </section>
+
+  <section>
+    <h2>Analyze Swift code</h2>
+    <textarea id="code" spellcheck="false">struct User: Hashable {
+    let id: String
+    var email: String?
+}
+
+func display(_ user: User?) -> String {
+    guard let user = user else { return "Unknown" }
+    let email = user.email ?? "none"
+    return "\(user.id) <\(email)>"
+}</textarea>
+    <button class="btn" id="analyze">Analyze</button>
+    <div id="report" style="margin-top:16px"></div>
+  </section>
+
+  <section>
+    <h2>Browse mappings</h2>
+    <div class="controls"><input type="search" id="q" placeholder="Search: guard let, ??, struct, inout, streams…" aria-label="Search mappings"></div>
+    <div class="controls" id="cats"></div>
+    <div class="controls" id="risks"></div>
+    <p class="count" id="count"></p>
+    <div id="list"></div>
+  </section>
+</main>
+
+<footer class="wrap">Java baseline 21 · Data: <a href="/api/guide">/api/guide</a></footer>
+
+<script>
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const state = { mappings: [], categories: [], cat: null, risk: null, q: '' };
+const base = location.origin;
+
+document.getElementById('prompt').textContent =
+`You have access to the Swift → Java conversion API at ${base} (Java 21, no auth).
+When converting Swift code to Java, or when asked for the Java equivalent of a Swift idiom:
+1. Porting Swift source: POST ${base}/api/analyze?format=md with the source as text/plain. Fix high-risk findings first.
+2. One idiom: GET ${base}/api/search?q={idiom}&format=md  (raw syntax works: q=??, q=guard let, q=inout)
+3. Full entry: GET ${base}/api/mappings/{id}?format=md
+4. Before finishing: GET ${base}/api/checklist?format=md
+Prefer these mappings over recall; never translate == on objects/strings to == in Java.`;
+
+document.querySelectorAll('.copy').forEach(b => b.addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(document.getElementById(b.dataset.target).textContent); b.textContent = 'Copied'; }
+  catch { b.textContent = 'Select & copy'; }
+  setTimeout(() => b.textContent = 'Copy', 1500);
+}));
+
+function chip(label, pressed, onClick) {
+  const b = document.createElement('button');
+  b.className = 'chip'; b.textContent = label; b.setAttribute('aria-pressed', pressed);
+  b.addEventListener('click', onClick); return b;
+}
+
+function renderFilters() {
+  const cats = document.getElementById('cats'); cats.replaceChildren();
+  cats.append(chip('All', state.cat === null, () => { state.cat = null; render(); }));
+  state.categories.forEach(c => cats.append(chip(`${c.title} (${c.mappingCount})`, state.cat === c.id, () => { state.cat = c.id; render(); })));
+  const risks = document.getElementById('risks'); risks.replaceChildren();
+  [null, 'high', 'medium', 'low'].forEach(r => risks.append(chip(r ? `${r} risk` : 'Any risk', state.risk === r, () => { state.risk = r; render(); })));
+}
+
+function card(m) {
+  const ex = (m.swiftExample || m.javaExample) ? `<div class="examples">
+      <div><div class="label">Swift</div><pre>${esc(m.swiftExample || '—')}</pre></div>
+      <div><div class="label">Java</div><pre>${esc(m.javaExample || '—')}</pre></div></div>` : '';
+  const g = m.gotchas.length ? `<div><div class="label">Watch out</div><ul class="gotchas">${m.gotchas.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '';
+  return `<details class="card"><summary>
+      <div class="row"><span class="risk ${m.risk}">${m.risk}</span><span class="title">${esc(m.title)}</span></div>
+      <div class="pair"><span class="sw">${esc(m.swift)}</span><span class="jv">${esc(m.java)}</span></div>
+    </summary><div class="body"><div>${esc(m.summary)}</div>${ex}${g}
+      <div class="meta">id: <a href="/api/mappings/${m.id}?format=md">${m.id}</a>${m.since ? ' · requires ' + esc(m.since) : ''}</div>
+    </div></details>`;
+}
+
+let searchIds = null;
+async function runSearch() {
+  if (!state.q) { searchIds = null; return; }
+  const r = await fetch(`/api/search?q=${encodeURIComponent(state.q)}&limit=50`).then(r => r.json());
+  const top = r.results.length ? r.results[0].score : 0;
+  searchIds = r.results.filter(h => h.score >= top * 0.3).map(h => h.id);   // keep strong matches only
+}
+
+function render() {
+  renderFilters();
+  let list = state.mappings
+    .filter(m => !state.cat || m.category === state.cat)
+    .filter(m => !state.risk || m.risk === state.risk);
+  if (searchIds) {
+    const order = new Map(searchIds.map((id, i) => [id, i]));
+    list = list.filter(m => order.has(m.id)).sort((a, b) => order.get(a.id) - order.get(b.id));
+  }
+  document.getElementById('count').textContent = `${list.length} mapping${list.length === 1 ? '' : 's'}`;
+  document.getElementById('list').innerHTML = list.map(card).join('');
+}
+
+let t;
+document.getElementById('q').addEventListener('input', e => {
+  state.q = e.target.value.trim();
+  clearTimeout(t); t = setTimeout(async () => { await runSearch(); render(); }, 200);
+});
+
+document.getElementById('analyze').addEventListener('click', async () => {
+  const out = document.getElementById('report');
+  out.textContent = 'Analyzing…';
+  const res = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: document.getElementById('code').value });
+  const r = await res.json();
+  if (!res.ok) { out.textContent = r.detail + ' ' + (r.hint || ''); return; }
+  const s = r.summary;
+  out.innerHTML = `<p class="count">${s.constructsFound} constructs · ${s.byRisk.high} high · ${s.byRisk.medium} medium · ${s.byRisk.low} low</p>` +
+    r.findings.map(f => `<div class="finding"><div class="row"><span class="risk ${f.risk}">${f.risk}</span><span class="title">${esc(f.title)}</span>
+      <span class="meta">${f.lines.map(l => 'L' + l.line).join(', ')}</span></div>
+      <div style="margin-top:4px">${esc(f.summary)}</div></div>`).join('');
+});
+
+fetch('/api/guide').then(r => r.json()).then(d => {
+  state.mappings = d.mappings; state.categories = d.categories;
+  document.getElementById('lede').textContent = `${d.mappings.length} curated mappings from Swift idioms to idiomatic Java ${d.guide.javaBaseline}, each with examples and the pitfalls that cause real bugs. Built for AI agents first, people second.`;
+  render();
+});
+</script>
+</body>
+</html>
