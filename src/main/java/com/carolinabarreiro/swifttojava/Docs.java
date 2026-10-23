@@ -2,8 +2,8 @@ package com.carolinabarreiro.swifttojava;
 
 import com.carolinabarreiro.swifttojava.Analyzer.Finding;
 import com.carolinabarreiro.swifttojava.Analyzer.Report;
-import com.carolinabarreiro.swifttojava.Guide.Category;
-import com.carolinabarreiro.swifttojava.Guide.Mapping;
+import com.carolinabarreiro.swifttojava.guide.Guide.*;
+import com.carolinabarreiro.swifttojava.guide.Guide;
 
 /** Markdown renderings for agents: llms.txt, llms-full.txt, single mappings, analyze reports. */
 public final class Docs {

@@ -1,4 +1,6 @@
-package com.carolinabarreiro.swifttojava;
+package com.carolinabarreiro.swifttojava.guide;
+
+import com.carolinabarreiro.swifttojava.Json;
 
 import java.io.IOException;
 import java.io.InputStream;

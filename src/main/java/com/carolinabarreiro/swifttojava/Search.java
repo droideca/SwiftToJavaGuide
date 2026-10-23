@@ -1,7 +1,7 @@
 package com.carolinabarreiro.swifttojava;
 
-import com.carolinabarreiro.swifttojava.Guide.Mapping;
-import com.carolinabarreiro.swifttojava.Guide.Risk;
+import com.carolinabarreiro.swifttojava.guide.Guide.*;
+import com.carolinabarreiro.swifttojava.guide.Guide;
 
 import java.util.Arrays;
 import java.util.Comparator;
