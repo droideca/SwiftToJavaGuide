@@ -63,9 +63,15 @@ Status: ✅ done · 🔄 in progress · ⬜ not started
 - **Spring Boot:** the IoC container, `@Configuration` + `@Bean`, constructor injection, `@RestController` / `@GetMapping`, automatic JSON serialization with Jackson.
 - **Agent-first:** responses are wrapped in a named object (`{"categories": [...]}`), not a bare array, so fields can be added later without breaking clients.
 
-### ⬜ 1. `GET /api/guide`
+### ✅ 1. `GET /api/guide`
 - **Spring Boot:** how Jackson serializes nested records; customizing it (lowercase enums, field naming) through configuration instead of annotations everywhere.
 - **Agent-first:** one call returns everything. An agent can load the whole dataset into context instead of making N requests.
+- **What came up:**
+  - A response record (`GuideResponse`) instead of a `Map`: typed, fixed key order, shape declared in one place.
+  - Spring Boot 4 uses Jackson 3, so Jackson 2 tutorials can be wrong. I checked property names against the actual jars.
+  - Two global properties: `spring.jackson.datatype.enum.write-enums-to-lowercase=true` and `spring.jackson.default-property-inclusion=non_null`. The reference omits `null` fields, but Jackson writes them by default. Pick one convention ("absent" vs `null`) and keep it.
+  - Verified by diffing the response against the reference server field by field.
+  - Moved the guide classes into a `guide/` package (package by feature). IntelliJ's move refactoring rewrote `Guide.Info` as `guide.Info`, so check the compile after a move.
 
 ### ⬜ 2. Read endpoints (mappings, categories/{id}, search, checklist, index)
 - **Spring Boot:** `@PathVariable`, `@RequestParam` (optional values, defaults), Bean Validation (`@Min`/`@Max`, `@Validated`).
