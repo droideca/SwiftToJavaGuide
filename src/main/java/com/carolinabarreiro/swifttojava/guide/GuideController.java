@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.util.List;
 import java.util.Locale;
@@ -145,5 +146,12 @@ class GuideController {
                           @RequestParam(defaultValue = "5") @Min(1) @Max(50) int limit) {
         List<Search.Hit> searchResult = search.search(q, limit);
         return SearchResponse.of(q, searchResult);
+    }
+
+    @GetMapping
+    ApiIndexResponse index() {
+        // TODO step 5: let a BASE_URL env var override the URL taken from the request
+        String base = ServletUriComponentsBuilder.fromCurrentContextPath().toUriString();
+        return ApiIndexResponse.of(guide, base);
     }
 }
