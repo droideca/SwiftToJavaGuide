@@ -1,6 +1,11 @@
 package com.carolinabarreiro.swifttojava.guide;
 
+import com.carolinabarreiro.swifttojava.Analyzer;
+import com.carolinabarreiro.swifttojava.Search;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -18,6 +23,12 @@ class GuideConfig {
     Guide guide() {
         return Guide.loadFromClasspath();   // loaded once, injected wherever needed
     }
+
+    @Bean
+    Analyzer analyzer(Guide guide) { return new Analyzer(guide); }
+
+    @Bean
+    Search search(Guide guide, Analyzer analyzer) { return new Search(guide, analyzer); }
 }
 
 record GuideResponse(
@@ -44,13 +55,27 @@ record RelatedMapping(String id, String title, String detailUrl) {
     }
 }
 
+record SearchResponse(String query, int count, List<Search.Hit> results, String hint) {
+    // Note to Caro: Hint is for the agent.
+    // The longer text is also more useful to an agent: it says what to try next and where to go (/api/categories).
+    static SearchResponse of(String query, List<Search.Hit> searchResult) {
+        String hint = null;
+        if (searchResult.isEmpty()) {
+            hint = "No results. Try a broader term, a Swift keyword (e.g. 'inout'), or browse /api/categories.";
+        }
+        return new SearchResponse(query, searchResult.size(), searchResult, hint);
+    }
+}
+
 @RestController
 @RequestMapping("/api")
 class GuideController {
     private final Guide guide;
+    private final Search search;
 
-    GuideController(Guide guide) {          // constructor injection, no @Autowired needed
+    GuideController(Guide guide, Search search) {          // constructor injection, no @Autowired needed
         this.guide = guide;
+        this.search = search;
     }
 
     @GetMapping("/categories")
@@ -113,5 +138,12 @@ class GuideController {
                 .map(RelatedMapping::of)
                 .toList();
         return new MappingResponse(mapping, relatedMappings);
+    }
+
+    @GetMapping("/search")
+    SearchResponse search(@RequestParam @NotBlank String q,
+                          @RequestParam(defaultValue = "5") @Min(1) @Max(50) int limit) {
+        List<Search.Hit> searchResult = search.search(q, limit);
+        return SearchResponse.of(q, searchResult);
     }
 }
