@@ -1,4 +1,4 @@
-package com.carolinabarreiro.swifttojava;
+package com.carolinabarreiro.swifttojava.guide;
 
 import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;

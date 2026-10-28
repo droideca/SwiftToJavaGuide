@@ -1,7 +1,7 @@
-package com.carolinabarreiro.swifttojava;
+package com.carolinabarreiro.swifttojava.guide;
 
+import com.carolinabarreiro.swifttojava.analyze.Analyzer;
 import com.carolinabarreiro.swifttojava.guide.Guide.*;
-import com.carolinabarreiro.swifttojava.guide.Guide;
 
 import java.util.Arrays;
 import java.util.Comparator;

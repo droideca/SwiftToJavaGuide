@@ -1,7 +1,7 @@
-package com.carolinabarreiro.swifttojava;
+package com.carolinabarreiro.swifttojava.docs;
 
-import com.carolinabarreiro.swifttojava.Analyzer.Finding;
-import com.carolinabarreiro.swifttojava.Analyzer.Report;
+import com.carolinabarreiro.swifttojava.analyze.Analyzer.Finding;
+import com.carolinabarreiro.swifttojava.analyze.Analyzer.Report;
 import com.carolinabarreiro.swifttojava.guide.Guide.*;
 import com.carolinabarreiro.swifttojava.guide.Guide;
 

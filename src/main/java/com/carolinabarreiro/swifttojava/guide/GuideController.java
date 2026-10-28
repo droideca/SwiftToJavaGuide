@@ -1,13 +1,8 @@
 package com.carolinabarreiro.swifttojava.guide;
 
-import com.carolinabarreiro.swifttojava.Analyzer;
-import com.carolinabarreiro.swifttojava.Search;
-import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -17,56 +12,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-
-@Configuration
-class GuideConfig {
-    @Bean
-    Guide guide() {
-        return Guide.loadFromClasspath();   // loaded once, injected wherever needed
-    }
-
-    @Bean
-    Analyzer analyzer(Guide guide) { return new Analyzer(guide); }
-
-    @Bean
-    Search search(Guide guide, Analyzer analyzer) { return new Search(guide, analyzer); }
-}
-
-record GuideResponse(
-        Guide.Info guide,
-        List<Guide.Category> categories,
-        List<Guide.Mapping> mappings,
-        List<Guide.ChecklistItem> checklist) {
-}
-
-record CategoryResponse(@JsonUnwrapped Guide.Category category, List<Guide.Mapping> mappings) {
-}
-
-record MappingsResponse(int count, List<Guide.Mapping> mappings) {
-    static MappingsResponse of(List<Guide.Mapping> mappings) {
-        return new MappingsResponse(mappings.size(), mappings);
-    }
-}
-
-record MappingResponse(@JsonUnwrapped Guide.Mapping mapping, List<RelatedMapping> relatedMappings) { }
-
-record RelatedMapping(String id, String title, String detailUrl) {
-    static RelatedMapping of(Guide.Mapping mapping) {
-        return new RelatedMapping(mapping.id(), mapping.title(), "/api/mappings/" + mapping.id());
-    }
-}
-
-record SearchResponse(String query, int count, List<Search.Hit> results, String hint) {
-    // Note to Caro: Hint is for the agent.
-    // The longer text is also more useful to an agent: it says what to try next and where to go (/api/categories).
-    static SearchResponse of(String query, List<Search.Hit> searchResult) {
-        String hint = null;
-        if (searchResult.isEmpty()) {
-            hint = "No results. Try a broader term, a Swift keyword (e.g. 'inout'), or browse /api/categories.";
-        }
-        return new SearchResponse(query, searchResult.size(), searchResult, hint);
-    }
-}
 
 @RestController
 @RequestMapping("/api")

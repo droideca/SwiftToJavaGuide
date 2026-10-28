@@ -1,4 +1,4 @@
-package com.carolinabarreiro.swifttojava;
+package com.carolinabarreiro.swifttojava.analyze;
 
 import com.carolinabarreiro.swifttojava.guide.Guide.*;
 import com.carolinabarreiro.swifttojava.guide.Guide;

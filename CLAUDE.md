@@ -25,14 +25,23 @@ An **agent-first API** built from the "Swift to Java" conversion guide. Basicall
 
 ## Current state of this project
 
-Ported as-is (package renamed, otherwise unchanged):
-- `Guide.java`: loads `resources/data/mappings.json` into records (Mapping, Category, ChecklistItem, Risk enum)
-- `Analyzer.java`: regex-based Swift construct detection → findings by line, ordered by risk
-- `Search.java`: ranked search. Accepts concepts or raw Swift syntax (`??`, `$0`, `guard let`).
-- `Docs.java`: Markdown renderings (llms.txt, llms-full.txt, a single mapping, analyze report)
-- `Json.java`: hand-written JSON parser, used only by `Guide` to load the dataset. Replace it with Jackson later.
+Packages are organized by feature, one type per file.
+
+Ported from the reference (package renamed, otherwise unchanged):
+- `guide/Guide.java`: loads `resources/data/mappings.json` into records (Mapping, Category, ChecklistItem, Risk enum)
+- `guide/Search.java`: ranked search. Accepts concepts or raw Swift syntax (`??`, `$0`, `guard let`).
+- `guide/Json.java`: hand-written JSON parser, used only by `Guide` to load the dataset. Replace it with Jackson later.
+- `analyze/Analyzer.java`: regex-based Swift construct detection → findings by line, ordered by risk
+- `docs/Docs.java`: Markdown renderings (llms.txt, llms-full.txt, a single mapping, analyze report)
 - `resources/static/`: `index.html` (human page), `SKILL.md` and `openapi.json`. The last two contain a `{{BASE_URL}}` placeholder that must be filled in per request.
-- `GuideController.java`: `GuideConfig` provides `Guide` as a bean; only `GET /api/categories` exists so far.
+
+Built in this project:
+- `guide/GuideConfig.java` provides `Guide` and `Search` as beans; `analyze/AnalyzeConfig.java` provides `Analyzer`.
+- `guide/GuideController.java` serves every read endpoint: `/api`, `/api/guide`, `/api/categories`, `/api/categories/{id}`, `/api/mappings`, `/api/mappings/{id}`, `/api/search`, `/api/checklist`.
+- `guide/*Response.java` and `guide/RelatedMapping.java`: response records. `ApiIndexResponse` is the response of `GET /api` (docs links, endpoint list, stats).
+- `application.properties`: Jackson writes enums in lowercase and omits `null` fields, to match the reference.
+- Errors so far are plain `ResponseStatusException`s or Bean Validation failures. The status codes are correct, but the bodies don't match the reference yet (step 6).
+- Not checked by automated tests yet (step 8). Each endpoint was verified by diffing its responses against the reference server.
 
 Deliberately NOT ported: `Server.java` (to be rebuilt as controllers), `SelfTest.java` (to become JUnit tests), `run.sh` and `Dockerfile`.
 
@@ -44,7 +53,7 @@ Deliberately NOT ported: `Server.java` (to be rebuilt as controllers), `SelfTest
 4. `?format=md` → `text/markdown` responses via `Docs`
 5. `/llms.txt`, `/llms-full.txt`, `/SKILL.md`, `/openapi.json` with `{{BASE_URL}}` filled from the request (or a `BASE_URL` env var)
 6. Errors → `ProblemDetail` (`application/problem+json`) through `@RestControllerAdvice`, keeping the extra `hint`, `example` and `suggestions` fields (an unknown mapping id suggests the closest ids via `Search`)
-7. CORS `*` and `Cache-Control: public, max-age=3600` on GETs
+7. CORS `*` and `Cache-Control: public, max-age=3600` on GETs. Also accept trailing slashes (`/api/`, `/api/guide/`) like the reference does; Spring Boot 4 returns 404 for them by default.
 8. Port `SelfTest` to JUnit 5 + MockMvc
 9. Later: Jackson instead of `Json.java`, springdoc for OpenAPI, deployment, possibly an MCP server
 
@@ -73,10 +82,24 @@ Status: ✅ done · 🔄 in progress · ⬜ not started
   - Verified by diffing the response against the reference server field by field.
   - Moved the guide classes into a `guide/` package (package by feature). IntelliJ's move refactoring rewrote `Guide.Info` as `guide.Info`, so check the compile after a move.
 
-### ⬜ 2. Read endpoints (mappings, categories/{id}, search, checklist, index)
+### ✅ 2. Read endpoints (mappings, categories/{id}, search, checklist, index)
 - **Spring Boot:** `@PathVariable`, `@RequestParam` (optional values, defaults), Bean Validation (`@Min`/`@Max`, `@Validated`).
 - **Java:** Streams for filtering and ranking, `Optional`.
 - **Agent-first:** endpoints are shaped around tasks, not database tables. `relatedMappings` lets the agent move to related entries without guessing. `GET /api` describes every endpoint so the API can be discovered with no outside docs. Search accepts raw syntax (`??`, `$0`), which is what an agent actually has in hand.
+- **What came up:**
+  - `@PathVariable` reads `/categories/{id}`; `@RequestParam` reads `?id=`. Mixing them up gives a 400 for a perfectly good URL.
+  - Optional parameters have three states: absent (`null`, so don't filter), present and valid, present and invalid (400). Treating "absent" as "invalid" was the main bug. Use `required = false` for "no filter", `defaultValue` when absent means a specific value (`limit=5`), and required when the endpoint is meaningless without it (`q`).
+  - A lookup that returns `null` becomes an empty 200 unless you check it. For an agent that's the worst answer, so return a 404. In the same way, an unknown filter value gets a 400 instead of `"count": 0`.
+  - Checked vs unchecked exceptions: `valueOf`, NPE and `ResponseStatusException` are unchecked, so the compiler doesn't warn you. Anything uncaught becomes a 500.
+  - `Enum.valueOf` matches the constant name exactly and throws. Normalize with `toUpperCase(Locale.ROOT)` and catch the exception.
+  - `@JsonUnwrapped` flattens a record's fields into the response (`CategoryResponse`, `MappingResponse`) without copying them. Its import stays `com.fasterxml.jackson.annotation` in Jackson 3.
+  - Records: static factories (`of`), extra constructors that must call `this(...)` first, nested records for parts of a response (`ApiIndexResponse.Docs`).
+  - Streams with method references: `related().stream().map(guide::mapping).filter(Objects::nonNull).map(RelatedMapping::of).toList()`.
+  - `@Bean` methods can take other beans as parameters, and Spring wires the graph `Guide` → `Analyzer` → `Search` → controller.
+  - Bean Validation (`@NotBlank`, `@Min`, `@Max`) works on controller parameters with no extra setup. The error messages are Spring's generic ones, though, and step 6 has to translate them. `@RequestParam` alone accepts `q=`, so you also need `@NotBlank`.
+  - REST paths: plural for both the collection and one item (`/mappings`, `/mappings/{id}`). A singular `/mapping/{id}` breaks every `detailUrl`.
+  - `ServletUriComponentsBuilder.fromCurrentContextPath()` gives the base URL of the current request (used for the `docs` links in `GET /api`).
+  - Contract details that are easy to miss: exact `hint` texts, `count` before the list, an empty list rather than a missing one.
 
 ### ⬜ 3. `POST /api/analyze`
 - **Spring Boot:** `@RequestBody`, accepting more than one content type (`consumes`), `ResponseEntity`, request size limits.
