@@ -10,6 +10,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 @Configuration
 class GuideConfig {
@@ -32,6 +33,14 @@ record CategoryResponse(@JsonUnwrapped Guide.Category category, List<Guide.Mappi
 record MappingsResponse(int count, List<Guide.Mapping> mappings) {
     static MappingsResponse of(List<Guide.Mapping> mappings) {
         return new MappingsResponse(mappings.size(), mappings);
+    }
+}
+
+record MappingResponse(@JsonUnwrapped Guide.Mapping mapping, List<RelatedMapping> relatedMappings) { }
+
+record RelatedMapping(String id, String title, String detailUrl) {
+    static RelatedMapping of(Guide.Mapping mapping) {
+        return new RelatedMapping(mapping.id(), mapping.title(), "/api/mappings/" + mapping.id());
     }
 }
 
@@ -90,5 +99,19 @@ class GuideController {
         }
 
         return MappingsResponse.of(guide.filter(category, riskEnum, tag));
+    }
+
+    @GetMapping("/mappings/{id}")
+    MappingResponse mapping(@PathVariable String id) {
+        Guide.Mapping mapping = guide.mapping(id);
+        if (mapping == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No mapping '" + id + "'");
+        }
+        List<RelatedMapping> relatedMappings = mapping.related().stream()
+                .map(guide::mapping)
+                .filter(Objects::nonNull)
+                .map(RelatedMapping::of)
+                .toList();
+        return new MappingResponse(mapping, relatedMappings);
     }
 }
