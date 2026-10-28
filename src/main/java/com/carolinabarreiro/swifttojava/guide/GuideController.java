@@ -4,13 +4,11 @@ import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Configuration
@@ -25,9 +23,17 @@ record GuideResponse(
         Guide.Info guide,
         List<Guide.Category> categories,
         List<Guide.Mapping> mappings,
-        List<Guide.ChecklistItem> checklist) {}
+        List<Guide.ChecklistItem> checklist) {
+}
 
-record CategoryResponse(@JsonUnwrapped Guide.Category category, List<Guide.Mapping> Mapping) {}
+record CategoryResponse(@JsonUnwrapped Guide.Category category, List<Guide.Mapping> mappings) {
+}
+
+record MappingsResponse(int count, List<Guide.Mapping> mappings) {
+    static MappingsResponse of(List<Guide.Mapping> mappings) {
+        return new MappingsResponse(mappings.size(), mappings);
+    }
+}
 
 @RestController
 @RequestMapping("/api")
@@ -60,5 +66,29 @@ class GuideController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No category '" + id + "'");
         }
         return new CategoryResponse(category, guide.filter(id, null, null));
+    }
+
+    @GetMapping("/mappings")
+    MappingsResponse mappings(@RequestParam(required = false) String category,
+                              @RequestParam(required = false) String risk,
+                              @RequestParam(required = false) String tag) {
+        Guide.Risk riskEnum = null;
+        if (risk != null) {
+            try {
+                riskEnum = Guide.Risk.valueOf(risk.toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException e) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown risk");
+            }
+        }
+
+        if (category != null && guide.category(category) == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown category");
+        }
+
+        if (tag != null && !guide.allTags().contains(tag)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown tag");
+        }
+
+        return MappingsResponse.of(guide.filter(category, riskEnum, tag));
     }
 }
