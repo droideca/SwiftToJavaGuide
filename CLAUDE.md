@@ -39,7 +39,13 @@ Built in this project:
 - `guide/GuideConfig.java` provides `Guide` and `Search` as beans; `analyze/AnalyzeConfig.java` provides `Analyzer`.
 - `guide/GuideController.java` serves every read endpoint: `/api`, `/api/guide`, `/api/categories`, `/api/categories/{id}`, `/api/mappings`, `/api/mappings/{id}`, `/api/search`, `/api/checklist`.
 - `guide/*Response.java` and `guide/RelatedMapping.java`: response records. `ApiIndexResponse` is the response of `GET /api` (docs links, endpoint list, stats).
+- `analyze/AnalyzeController.java`: `POST /api/analyze`, with three handlers on the same path:
+  - JSON `{"code": ...}`
+  - form-urlencoded (what `curl --data-binary` sends without `-H`), read as raw bytes
+  - everything else, treated as raw text
+  - All three share the blank check (400) and the 200 KB limit (413).
 - `application.properties`: Jackson writes enums in lowercase and omits `null` fields, to match the reference.
+- `AnalyzeConfig.strictStrings()`: a `JsonMapperBuilderCustomizer` so request bodies reject numbers and booleans in `String` fields. It's app-wide, so move it to a shared config package in step 6 or 7.
 - Errors so far are plain `ResponseStatusException`s or Bean Validation failures. The status codes are correct, but the bodies don't match the reference yet (step 6).
 - Not checked by automated tests yet (step 8). Each endpoint was verified by diffing its responses against the reference server.
 
@@ -101,9 +107,24 @@ Status: ✅ done · 🔄 in progress · ⬜ not started
   - `ServletUriComponentsBuilder.fromCurrentContextPath()` gives the base URL of the current request (used for the `docs` links in `GET /api`).
   - Contract details that are easy to miss: exact `hint` texts, `count` before the list, an empty list rather than a missing one.
 
-### ⬜ 3. `POST /api/analyze`
+### ✅ 3. `POST /api/analyze`
 - **Spring Boot:** `@RequestBody`, accepting more than one content type (`consumes`), `ResponseEntity`, request size limits.
 - **Agent-first:** accept input in whatever form is easiest for the agent to send (raw text or JSON). Findings come with line numbers and are ordered by risk, so they can be acted on directly. The response says plainly that detection may produce false positives.
+- **What came up:**
+  - `@RequestBody String` gives the raw text; `@RequestBody SomeRecord` makes Jackson parse JSON into the record.
+  - Several handlers can share one path. Spring picks the most specific `consumes` match, and a handler without `consumes` catches everything else, including a missing `Content-Type`.
+  - Body validation has three layers:
+    - Jackson syntax/shape errors are an automatic 400.
+    - `@Valid` + `@NotBlank` on the record's fields covers `{}`, `null` and `""`.
+    - Type coercion: Jackson silently turns `42`/`true` into `"42"`/`"true"`. `ALLOW_COERCION_OF_SCALARS` does not stop it for `String`; a coercion config in a `JsonMapperBuilderCustomizer` bean does.
+  - **The curl trap:** `curl --data-binary @File.swift` without `-H` sends `application/x-www-form-urlencoded`. Spring then hands `@RequestBody String` the body re-encoded as form fields (`let+n+=+Int%28...`), and the result is a 200 with a wrong report. That's the worst failure for an agent because nothing signals it. Fix: a dedicated handler that reads the raw bytes via `HttpServletRequest.getInputStream()`.
+  - `getInputStream()` throws `IOException`, the first checked exception in the project, so the method needs `throws IOException`.
+  - Size limits count bytes (`getBytes(UTF_8).length`), not characters. Spring has no default limit for a normal request body.
+  - One private `validateAndAnalyze` holds the shared rules, so the three entry points can't drift apart.
+  - `static` is allowed on fields, not on local variables. Constants are `static final UPPER_SNAKE_CASE` at the top of the class.
+  - IntelliJ's Extract Method can add JSpecify `@NonNull` (written `Analyzer.@NonNull Report` for a nested type). Adopt it project-wide or not at all.
+  - `@Bean` placement: beans can live in any `@Configuration` under the main package and be injected across packages (`Search` in `guide` gets `Analyzer` from `analyze`).
+  - Verified with 20 cases against the reference: text, JSON, form, Unicode, every 400, every 413, no content type, XML.
 
 ### ⬜ 4. `?format=md`
 - **Spring Boot:** content negotiation, `produces`, `MediaType`, returning `String` bodies with a custom `Content-Type`.
