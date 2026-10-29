@@ -48,7 +48,7 @@ class AnalyzeController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The content is empty");
         }
         if (code.getBytes(StandardCharsets.UTF_8).length > MAX_BODY_BYTES) {
-            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Maximum body size is " + MAX_BODY_BYTES + " bytes");
+            throw new ResponseStatusException(HttpStatus.CONTENT_TOO_LARGE, "Maximum body size is " + MAX_BODY_BYTES + " bytes");
         }
         return analyzer.analyze(code);
     }
