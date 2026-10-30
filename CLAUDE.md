@@ -44,6 +44,10 @@ Built in this project:
   - form-urlencoded (what `curl --data-binary` sends without `-H`), read as raw bytes
   - everything else, treated as raw text
   - All three share the blank check (400) and the 200 KB limit (413).
+- `docs/DocsConfig.java` provides `Docs`. `?format=md` returns `text/markdown` (constant `Docs.MARKDOWN`) on checklist, categories/{id}, mappings, mappings/{id}, search and analyze:
+  - `GuideController` has a second handler per endpoint with `params = "format=md"`. JSON and Markdown handlers share private lookup/validation helpers (`findCategory`, `findMapping`, `filterMappings`), so both formats fail the same way.
+  - `AnalyzeController` can't use `params` (see step 4), so it reads `format` from the raw query string and returns `ResponseEntity<?>`.
+  - Known difference: the reference also accepts `?format=markdown`. Analyze does too, but the GET endpoints return JSON for it, because `params` can't express "md or markdown".
 - `application.properties`: Jackson writes enums in lowercase and omits `null` fields, to match the reference.
 - `AnalyzeConfig.strictStrings()`: a `JsonMapperBuilderCustomizer` so request bodies reject numbers and booleans in `String` fields. It's app-wide, so move it to a shared config package in step 6 or 7.
 - Errors so far are plain `ResponseStatusException`s or Bean Validation failures. The status codes are correct, but the bodies don't match the reference yet (step 6).
@@ -126,9 +130,17 @@ Status: ✅ done · 🔄 in progress · ⬜ not started
   - `@Bean` placement: beans can live in any `@Configuration` under the main package and be injected across packages (`Search` in `guide` gets `Analyzer` from `analyze`).
   - Verified with 20 cases against the reference: text, JSON, form, Unicode, every 400, every 413, no content type, XML.
 
-### ⬜ 4. `?format=md`
+### ✅ 4. `?format=md`
 - **Spring Boot:** content negotiation, `produces`, `MediaType`, returning `String` bodies with a custom `Content-Type`.
 - **Agent-first:** Markdown costs fewer tokens and LLMs read it well. JSON is for code, Markdown is for a model's context, and both come from the same endpoint.
+- **What came up:**
+  - A bean's name defaults to its `@Bean` method name. Declaring `docs()` in two configs makes the app fail at startup ("overriding is disabled"). Declare each bean once, in its own feature's config (`docs/DocsConfig`), and inject it anywhere.
+  - `params = "format=md"` routes a request to a handler by query parameter, like `consumes` does by content type. Each handler keeps one typed return value. `params` values are ANDed, so it can't say "md or markdown".
+  - `produces = "text/markdown;charset=UTF-8"` + a `String` return → `StringHttpMessageConverter` writes it unchanged with that `Content-Type`.
+  - Two handlers per endpoint means the validation must live in shared private helpers, or the Markdown version silently skips the 400s and 404s.
+  - Markdown text belongs in `Docs`, not in controllers, so the strings that are part of the contract live in one place.
+  - **The body trap again:** `params` calls `request.getParameter()`, and for a form-urlencoded POST, Tomcat answers by consuming the whole body. Adding `params` to any `/analyze` handler broke form posts, even without `?format=md`. For analyze: read `getQueryString()` with `UriComponentsBuilder` and return `ResponseEntity<?>` (status + headers + body built in code).
+  - Verified 60 cases against the reference (GET and analyze × no format, `md`, `markdown`): every status code matches, every Markdown body matches byte for byte with the right `Content-Type`, and the JSON versions are unchanged.
 
 ### ⬜ 5. `/llms.txt`, `/llms-full.txt`, `/SKILL.md`, `/openapi.json`
 - **Spring Boot:** static vs dynamic resources, reading the request URL (`ServletUriComponentsBuilder`), externalized config (`@Value`, env vars, `application.properties`).

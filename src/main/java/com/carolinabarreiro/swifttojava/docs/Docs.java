@@ -5,8 +5,11 @@ import com.carolinabarreiro.swifttojava.analyze.Analyzer.Report;
 import com.carolinabarreiro.swifttojava.guide.Guide.*;
 import com.carolinabarreiro.swifttojava.guide.Guide;
 
+import java.util.List;
+
 /** Markdown renderings for agents: llms.txt, llms-full.txt, single mappings, analyze reports. */
 public final class Docs {
+    public static final String MARKDOWN = "text/markdown;charset=UTF-8";
 
     private final Guide guide;
 
@@ -123,6 +126,29 @@ public final class Docs {
             sb.append("\n## Checklist\n\n");
             r.checklist().forEach(c -> sb.append("- [ ] ").append(c.text()).append("\n"));
         }
+        return sb.toString();
+    }
+
+    public String mappings(List<Mapping> mappings) {
+        var sb = new StringBuilder();
+        mappings.forEach(m -> sb.append(mapping(m, 2)).append("\n"));
+        return sb.toString();
+    }
+
+    public String category(Category c, List<Mapping> mappings) {
+        return "# " + c.title() + "\n\n" + c.summary() + "\n\n" + mappings(mappings);
+    }
+
+    public String search(String query, List<Mapping> results) {
+        var sb = new StringBuilder("# Search: " + query + "\n\n");
+        if (results.isEmpty()) sb.append("No results. Try a broader term or browse /api/categories.\n");
+        sb.append(mappings(results));
+        return sb.toString();
+    }
+
+    public String checklist() {
+        var sb = new StringBuilder("# Swift → Java translation checklist\n\n");
+        guide.checklist().forEach(c -> sb.append("- [ ] ").append(c.text()).append("\n"));
         return sb.toString();
     }
 }
