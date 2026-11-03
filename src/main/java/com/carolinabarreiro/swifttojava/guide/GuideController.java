@@ -1,13 +1,13 @@
 package com.carolinabarreiro.swifttojava.guide;
 
 import com.carolinabarreiro.swifttojava.docs.Docs;
+import com.carolinabarreiro.swifttojava.web.BaseUrl;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.util.List;
 import java.util.Locale;
@@ -20,11 +20,13 @@ class GuideController {
     private final Guide guide;
     private final Search search;
     private final Docs docs;
+    private final BaseUrl baseUrl;
 
-    GuideController(Guide guide, Search search, Docs docs) {          // constructor injection, no @Autowired needed
+    GuideController(Guide guide, Search search, Docs docs, BaseUrl baseUrl) {          // constructor injection, no @Autowired needed
         this.guide = guide;
         this.search = search;
         this.docs = docs;
+        this.baseUrl = baseUrl;
     }
 
     @GetMapping("/categories")
@@ -105,9 +107,7 @@ class GuideController {
 
     @GetMapping
     ApiIndexResponse index() {
-        // TODO step 5: let a BASE_URL env var override the URL taken from the request
-        String base = ServletUriComponentsBuilder.fromCurrentContextPath().toUriString();
-        return ApiIndexResponse.of(guide, base);
+        return ApiIndexResponse.of(guide, baseUrl.get());
     }
 
     // Lookups and validation shared by the JSON and Markdown handlers, so both formats fail the same way.

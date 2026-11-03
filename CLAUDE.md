@@ -49,7 +49,9 @@ Built in this project:
   - `AnalyzeController` can't use `params` (see step 4), so it reads `format` from the raw query string and returns `ResponseEntity<?>`.
   - Known difference: the reference also accepts `?format=markdown`. Analyze does too, but the GET endpoints return JSON for it, because `params` can't express "md or markdown".
 - `application.properties`: Jackson writes enums in lowercase and omits `null` fields, to match the reference.
-- `AnalyzeConfig.strictStrings()`: a `JsonMapperBuilderCustomizer` so request bodies reject numbers and booleans in `String` fields. It's app-wide, so move it to a shared config package in step 6 or 7.
+- `docs/DocsController.java`: `/llms.txt`, `/llms-full.txt`, `/SKILL.md`, `/openapi.json`. The last two are the `resources/static` templates with `{{BASE_URL}}` replaced; the controller mappings take priority over Spring's static copies.
+- `web/` is the shared package: `BaseUrl` (bean from `WebConfig`) returns the `BASE_URL` setting with any trailing `/` removed, or else the current request's base URL. Every absolute link (`GET /api` and the four discovery files) uses it.
+- `AnalyzeConfig.strictStrings()`: a `JsonMapperBuilderCustomizer` so request bodies reject numbers and booleans in `String` fields. It's app-wide, so move it to `web/` in step 6 or 7.
 - Errors so far are plain `ResponseStatusException`s or Bean Validation failures. The status codes are correct, but the bodies don't match the reference yet (step 6).
 - Not checked by automated tests yet (step 8). Each endpoint was verified by diffing its responses against the reference server.
 
@@ -142,9 +144,16 @@ Status: ✅ done · 🔄 in progress · ⬜ not started
   - **The body trap again:** `params` calls `request.getParameter()`, and for a form-urlencoded POST, Tomcat answers by consuming the whole body. Adding `params` to any `/analyze` handler broke form posts, even without `?format=md`. For analyze: read `getQueryString()` with `UriComponentsBuilder` and return `ResponseEntity<?>` (status + headers + body built in code).
   - Verified 60 cases against the reference (GET and analyze × no format, `md`, `markdown`): every status code matches, every Markdown body matches byte for byte with the right `Content-Type`, and the JSON versions are unchanged.
 
-### ⬜ 5. `/llms.txt`, `/llms-full.txt`, `/SKILL.md`, `/openapi.json`
+### ✅ 5. `/llms.txt`, `/llms-full.txt`, `/SKILL.md`, `/openapi.json`
 - **Spring Boot:** static vs dynamic resources, reading the request URL (`ServletUriComponentsBuilder`), externalized config (`@Value`, env vars, `application.properties`).
 - **Agent-first:** the conventions agents look for (llms.txt, skills, OpenAPI), with absolute URLs filled in for wherever the API is deployed, so the agent never builds a link to the wrong host.
+- **What came up** (implemented by Claude, as this step was less interesting to me):
+  - Spring Boot serves `resources/static/` as-is with no code. Before this step, `/SKILL.md` and `/openapi.json` already responded, but with a literal `{{BASE_URL}}`. A controller mapping for the same path wins over the static file.
+  - Classpath files are read with `ClassPathResource(...).getContentAsString(UTF_8)`. The templates are read once, when the controller is created; `IOException` is wrapped in `UncheckedIOException`, so a missing file fails at startup.
+  - `@Value("${BASE_URL:}")` reads a setting from env vars, `application.properties` or `--BASE_URL=` args, with `:` giving the default (empty here). It works on `@Bean` method parameters too.
+  - "What's my public URL" is one bean (`BaseUrl`), not logic repeated in five handlers. A deployed server can't know its public address from the request, hence the override.
+  - Behind a reverse proxy, Spring ignores `X-Forwarded-*` unless `server.forward-headers-strategy=framework` is set. Not set yet.
+  - Verified all four files + `GET /api` + `index.html` against the reference, with and without `BASE_URL=https://example.com/`.
 
 ### ⬜ 6. Errors as `ProblemDetail`
 - **Spring Boot:** custom exceptions, `@RestControllerAdvice` + `@ExceptionHandler`, `ProblemDetail` (RFC 9457) with extra properties.
